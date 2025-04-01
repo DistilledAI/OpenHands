@@ -18,6 +18,7 @@ class FileSettingsStore(SettingsStore):
 
     async def load(self) -> Settings | None:
         try:
+            print('self.path', self.path)
             json_str = await call_sync_from_async(self.file_store.read, self.path)
             kwargs = json.loads(json_str)
             settings = Settings(**kwargs)
@@ -34,4 +35,5 @@ class FileSettingsStore(SettingsStore):
         cls, config: AppConfig, user_id: str | None
     ) -> FileSettingsStore:
         file_store = get_file_store(config.file_store, config.file_store_path)
+        print('config.file_store_path', config.file_store_path)
         return FileSettingsStore(file_store)

@@ -94,6 +94,7 @@ class Session:
             EventSource.ENVIRONMENT,
         )
         agent_cls = settings.agent or self.config.default_agent
+
         self.config.security.confirmation_mode = (
             self.config.security.confirmation_mode
             if settings.confirmation_mode is None

@@ -25,6 +25,7 @@
 
 # Base path for the workspace
 workspace_base = "./workspace"
+file_store_path = "./file_store"
 
 # Cache directory path
 #cache_dir = "/tmp/cache"

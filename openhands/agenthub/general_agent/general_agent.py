@@ -1,7 +1,7 @@
 import os
 from collections import deque
 
-import openhands.agenthub.codeact_agent.function_calling as codeact_function_calling
+import openhands.agenthub.general_agent.function_calling as codeact_function_calling
 from openhands.controller.agent import Agent
 from openhands.controller.state.state import State
 from openhands.core.config import AgentConfig
@@ -22,10 +22,10 @@ from openhands.runtime.plugins import (
 from openhands.utils.prompt import PromptManager
 
 
-class CodeActAgent(Agent):
-    VERSION = '2.2'
+class GeneralAgent(Agent):
+    VERSION = '1.0'
     """
-    The Code Act Agent is a minimalist agent.
+    The General Agent is a minimalist agent.
     The agent works by passing the model a list of action-observation pairs and prompting the model to take the next step.
 
     ### Overview
@@ -54,7 +54,7 @@ class CodeActAgent(Agent):
     def __init__(
         self, llm: LLM, config: AgentConfig, mcp_tools: list[dict] | None = None
     ) -> None:
-        """Initializes a new instance of the CodeActAgent class.
+        """Initializes a new instance of the GeneralAgent class.
 
         Parameters:
         - llm (LLM): The llm to be used by this agent
@@ -76,7 +76,7 @@ class CodeActAgent(Agent):
 
         # Retrieve the enabled tools
         logger.info(
-            f"TOOLS loaded for CodeActAgent: {', '.join([tool.get('function').get('name') for tool in self.tools])}"
+            f"TOOLS loaded for GeneralAgent: {', '.join([tool.get('function').get('name') for tool in self.tools])}"
         )
         self.prompt_manager = PromptManager(
             prompt_dir=os.path.join(os.path.dirname(__file__), 'prompts'),
@@ -108,7 +108,6 @@ class CodeActAgent(Agent):
         - AgentFinishAction() - end the interaction
         """
         # Continue with pending actions if any
-        print('pending_actions', self.pending_actions)
         if self.pending_actions:
             return self.pending_actions.popleft()
 
@@ -173,11 +172,8 @@ class CodeActAgent(Agent):
             with_caching=self.llm.is_caching_prompt_active()
         )
 
-        print('messages', messages)
-
         # Condense the events from the state.
         events = self.condenser.condensed_history(state)
-        print('condensed_history', events)
 
         logger.debug(
             f'Processing {len(events)} events from a total of {len(state.history)} events'

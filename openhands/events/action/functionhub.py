@@ -1,0 +1,31 @@
+from dataclasses import dataclass
+from typing import ClassVar
+
+from openhands.core.schema import ActionType
+from openhands.events.action.action import Action, ActionSecurityRisk
+
+
+@dataclass
+class FunctionHubAction(Action):
+    name: str
+    id_functionhub: str
+    arguments: str
+    thought: str = ''
+    action: str = ActionType.FUNCTION_HUB
+    runnable: ClassVar[bool] = True
+    security_risk: ActionSecurityRisk | None = None
+
+    @property
+    def message(self) -> str:
+        return (
+            f'I am interacting with the Function Hub with name:\n'
+            f'```\n{self.name}\n```\n'
+            f'and arguments:\n'
+            f'```\n{self.arguments}\n```'
+        )
+
+    def __str__(self) -> str:
+        ret = '**FunctionHubAction**\n'
+        if self.thought:
+            ret += f'THOUGHT: {self.thought}\n'
+        return ret

@@ -42,6 +42,10 @@ class ActionType(str, Enum):
     """Interact with the MCP server.
     """
 
+    FUNCTION_HUB = 'call_tool_functionhub'
+    """Interact with the Function Hub.
+    """
+
     DELEGATE = 'delegate'
     """Delegates a task to another agent.
     """

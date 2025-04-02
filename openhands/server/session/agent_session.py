@@ -122,6 +122,15 @@ class AgentSession:
                 self.logger.info(f'MCP stdio commands: {config.mcp.stdio.commands}')
                 self.logger.info(f'MCP stdio args: {config.mcp.stdio.args}')
 
+                # Log FunctionHub configuration to help with debugging
+                self.logger.info(
+                    f'FunctionHub URL: {config.functionhub.function_hub_url}'
+                )
+                self.logger.info(
+                    f'FunctionHub wallet address: {config.functionhub.function_hub_wallet_address}'
+                )
+                # self.logger.info(f'FunctionHub API key: {config.functionhub.function_hub_api_key}')
+
                 # Check if MCP servers are available
                 if not config.mcp.sse.mcp_servers and not config.mcp.stdio.commands:
                     self.logger.warning(

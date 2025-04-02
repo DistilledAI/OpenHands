@@ -47,6 +47,7 @@ from openhands.events.action import (
     FileWriteAction,
     IPythonRunCellAction,
 )
+from openhands.events.action.functionhub import FunctionHubAction
 from openhands.events.action.mcp import McpAction
 from openhands.events.event import FileEditSource, FileReadSource
 from openhands.events.observation import (
@@ -67,6 +68,7 @@ from openhands.mcp.mcp_base import ToolResult as MCPToolResult
 from openhands.runtime.browser import browse
 from openhands.runtime.browser.browser_env import BrowserEnv
 from openhands.runtime.plugins import ALL_PLUGINS, JupyterPlugin, Plugin, VSCodePlugin
+from openhands.runtime.run_functionhub import FunctionHubRunner
 from openhands.runtime.utils.bash import BashSession
 from openhands.runtime.utils.files import insert_lines, read_lines
 from openhands.runtime.utils.memory_monitor import MemoryMonitor
@@ -79,6 +81,7 @@ class ActionRequest(BaseModel):
     action: dict
     sse_mcp_config: Optional[list[str]] = None
     stdio_mcp_config: Optional[tuple[list[str], list[list[str]]]] = None
+    functionhub_config: Optional[dict] = None
     caller_platform: str = 'Linux'
 
 
@@ -196,6 +199,7 @@ class ActionExecutor:
             in ['true', '1', 'yes']
         )
         self.memory_monitor.start_monitoring()
+        self.functionhub_runner = FunctionHubRunner()
 
     @property
     def initial_cwd(self):
@@ -206,6 +210,7 @@ class ActionExecutor:
         self.sse_mcp_servers = action_request.sse_mcp_config
         self.stdio_mcp_config = action_request.stdio_mcp_config
         self.caller_platform = action_request.caller_platform
+        self.functionhub_config = action_request.functionhub_config
 
     async def _init_browser_async(self):
         """Initialize the browser asynchronously."""
@@ -524,6 +529,15 @@ class ActionExecutor:
     async def browse_interactive(self, action: BrowseInteractiveAction) -> Observation:
         await self._ensure_browser_ready()
         return await browse(action, self.browser)
+
+    async def call_tool_functionhub(self, action: FunctionHubAction) -> Observation:
+        logger.debug(
+            f'Calling tool functionhub: {action.name} ({action.id_functionhub})'
+        )
+        logger.debug(f'Caller platform: {self.caller_platform}')
+        args_parsed = json.loads(action.arguments)
+        response = await self.functionhub_runner.run(action.id_functionhub, args_parsed)
+        return response
 
     async def call_tool_mcp(self, action: McpAction) -> Observation:
         mcp_server_urls = self.sse_mcp_servers or []

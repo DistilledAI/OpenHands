@@ -27,6 +27,7 @@ from openhands.events.action import (
 )
 from openhands.events.action.action import Action
 from openhands.events.action.files import FileEditSource
+from openhands.events.action.functionhub import FunctionHubAction
 from openhands.events.action.mcp import McpAction
 from openhands.events.observation import (
     AgentThinkObservation,
@@ -319,6 +320,9 @@ class ActionExecutionClient(Runtime):
         return self.send_action_for_execution(action)
 
     def call_tool_mcp(self, action: McpAction) -> Observation:
+        return self.send_action_for_execution(action)
+
+    def call_tool_functionhub(self, action: FunctionHubAction) -> Observation:
         return self.send_action_for_execution(action)
 
     def close(self) -> None:

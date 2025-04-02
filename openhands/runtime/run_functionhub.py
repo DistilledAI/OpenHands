@@ -31,6 +31,10 @@ class BaseFunctionHubResponse(BaseModel):
     description: str = Field(default='')
 
 
+class FunctionHubChatCompletionToolParam(ChatCompletionToolParam):
+    id_functionhub: str = Field(default='')
+
+
 class FunctionHubRunner:
     def __init__(self):
         self.config: AppConfig = load_app_config()
@@ -193,13 +197,79 @@ class FunctionHubRunner:
                 )
             ]
 
-    async def search_with_rerank(
+    def search_with_rerank(
         self,
         search_query: str,
         reranker_query: str,
         top_k_search: int = 20,
         top_k_reranked: int = 5,
-    ) -> List[ChatCompletionToolParam]:
+        timeout: int = 5,
+    ) -> List[FunctionHubChatCompletionToolParam]:
+        """Search for functions and rerank results."""
+        import requests
+
+        url = f'{self.function_hub_url}/v1/functions/search-function-and-rerank'
+
+        payload = {
+            'wallet': self.function_hub_wallet_address,
+            'search_query': search_query,
+            'reranker_query': reranker_query,
+            'top_k_search': top_k_search,
+            'top_k_reranked': top_k_reranked,
+        }
+
+        try:
+            response = requests.post(
+                url, headers=self.headers, json=payload, timeout=timeout
+            )
+
+            if response.status_code != 200:
+                logger.error(f'Error in search with rerank: {response.text}')
+                return []
+
+            result = response.json()
+
+            # Process and convert the search results to ChatCompletionToolParam objects
+            tools = []
+
+            if 'results' in result and isinstance(result['results'], list):
+                for item in result['results']:
+                    if 'entity' in item and 'function_metadata' in item['entity']:
+                        metadata = item['entity']['function_metadata']
+                        function_id = item['entity'].get('function_id', '')
+
+                        if 'function' in metadata:
+                            func_info = metadata['function']
+
+                            # Create a ChatCompletionToolParam object
+                            tool = FunctionHubChatCompletionToolParam(
+                                type='function',
+                                id_functionhub=function_id,
+                                function=ChatCompletionToolParamFunctionChunk(
+                                    name=func_info.get(
+                                        'name', f'function_{function_id}'
+                                    ),
+                                    description=func_info.get('description', ''),
+                                    parameters=func_info.get('parameters', {}),
+                                ),
+                            )
+
+                            # Add to the list of tools
+                            tools.append(tool)
+
+            return tools
+
+        except Exception as e:
+            logger.error(f'Exception during search with rerank: {str(e)}')
+            return []
+
+    async def asearch_with_rerank(
+        self,
+        search_query: str,
+        reranker_query: str,
+        top_k_search: int = 20,
+        top_k_reranked: int = 5,
+    ) -> List[FunctionHubChatCompletionToolParam]:
         """Search for functions and rerank results."""
         url = f'{self.function_hub_url}/v1/functions/search-function-and-rerank'
 
@@ -239,8 +309,9 @@ class FunctionHubRunner:
                                     func_info = metadata['function']
 
                                     # Create a ChatCompletionToolParam object
-                                    tool = ChatCompletionToolParam(
+                                    tool = FunctionHubChatCompletionToolParam(
                                         type='function',
+                                        id_functionhub=function_id,
                                         function=ChatCompletionToolParamFunctionChunk(
                                             name=func_info.get(
                                                 'name', f'function_{function_id}'

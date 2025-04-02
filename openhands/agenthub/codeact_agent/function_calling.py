@@ -4,6 +4,7 @@ This is similar to the functionality of `CodeActResponseParser`.
 """
 
 import json
+from typing import Any, Optional
 
 from litellm import (
     ChatCompletionToolParam,
@@ -37,10 +38,12 @@ from openhands.events.action import (
     IPythonRunCellAction,
     MessageAction,
 )
+from openhands.events.action.functionhub import FunctionHubAction
 from openhands.events.action.mcp import McpAction
 from openhands.events.event import FileEditSource, FileReadSource
 from openhands.events.tool import ToolCallMetadata
 from openhands.llm import LLM
+from openhands.runtime.run_functionhub import FunctionHubChatCompletionToolParam
 
 
 def combine_thought(action: Action, thought: str) -> Action:
@@ -53,11 +56,25 @@ def combine_thought(action: Action, thought: str) -> Action:
     return action
 
 
-def response_to_actions(response: ModelResponse) -> list[Action]:
+def response_to_actions(
+    response: ModelResponse,
+    function_hub_tools: Optional[list[FunctionHubChatCompletionToolParam]] = None,
+) -> list[Action]:
+    """
+    Convert a response from the LLM to a list of actions.
+    function_hub_tools is a list of tools that are inputed to the LLM.
+    """
     actions: list[Action] = []
     assert len(response.choices) == 1, 'Only one choice is supported for now'
     choice = response.choices[0]
     assistant_msg = choice.message
+    if function_hub_tools is None:
+        function_hub_tools = []
+    dicts_function_hub_tools = []
+    for tool in function_hub_tools:
+        if isinstance(tool, FunctionHubChatCompletionToolParam):
+            tool = tool.model_dump()
+        dicts_function_hub_tools.append(tool)
     if hasattr(assistant_msg, 'tool_calls') and assistant_msg.tool_calls:
         # Check if there's assistant_msg.content. If so, add it to the thought
         thought = ''
@@ -193,7 +210,23 @@ def response_to_actions(response: ModelResponse) -> list[Action]:
                         f'Missing required argument "url" in tool call {tool_call.function.name}'
                     )
                 action = BrowseURLAction(url=arguments['url'])
+            # ================================================
+            # FunctionHubTool
+            # ================================================
+            elif tool_call.function.name in [
+                tool['name'] for tool in dicts_function_hub_tools
+            ]:
+                logger.debug(f'FunctionHubTool in function_calling.py: {tool_call}')
+                function_meatadata: dict[str, Any] = {}
+                for x in dicts_function_hub_tools:
+                    if x['name'] == tool_call.function.name:
+                        function_meatadata = x
 
+                action = FunctionHubAction(
+                    name=tool_call.function.name,
+                    arguments=tool_call.function.arguments,
+                    id_functionhub=function_meatadata['id_functionhub'],
+                )
             # ================================================
             # Other cases -> McpTool (MCP)
             # ================================================

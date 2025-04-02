@@ -1,4 +1,3 @@
-import asyncio
 import os
 from collections import deque
 
@@ -130,27 +129,31 @@ class CodeActAgent(Agent):
 
         logger.info('Searching for additional tools from Function Hub for current task')
         # Use search_tool to get additional tools based on current plan and step
-        additional_tools = asyncio.run(
-            self.functionhub_runner.search_with_rerank(current_plan_state, current_step)
+        function_hub_tools = self.functionhub_runner.search_with_rerank(
+            current_plan_state, current_step
         )
 
         logger.info(
-            f'Found {len(additional_tools)} additional tools from Function Hub for current task'
+            f'Found {len(function_hub_tools)} additional tools from Function Hub for current task'
         )
 
         # Combine base tools with the dynamically found tools
-        combined_tools = self.tools + additional_tools
+        combined_tools = self.tools + function_hub_tools
 
         params: dict = {
             'messages': self.llm.format_messages_for_llm(messages),
             'tools': combined_tools,  # Use combined tools instead of just self.tools
         }
 
+        print(f'Params: {params}')
+
         # log to litellm proxy if possible
         params['extra_body'] = {'metadata': state.to_llm_metadata(agent_name=self.name)}
         response = self.llm.completion(**params)
         logger.debug(f'Response from LLM: {response}')
-        actions = codeact_function_calling.response_to_actions(response)
+        actions = codeact_function_calling.response_to_actions(
+            response, function_hub_tools
+        )
         logger.debug(f'Actions after response_to_actions: {actions}')
         for action in actions:
             self.pending_actions.append(action)

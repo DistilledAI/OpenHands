@@ -13,9 +13,9 @@ class FunctionHubObservation(Observation):
     function_name: str = field(default='')
     id_functionhub: str = field(default='')
     text_content: str = field(default='')
-    image_urls: List[str] = field(default=[])
-    video_urls: List[str] = field(default=[])
-    audio_urls: List[str] = field(default=[])
+    image_urls: List[str] = field(default_factory=list)
+    video_urls: List[str] = field(default_factory=list)
+    audio_urls: List[str] = field(default_factory=list)
     blob: str = field(default='')
     error: str = field(default='')
 

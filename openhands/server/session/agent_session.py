@@ -195,7 +195,11 @@ class AgentSession:
                     # Create a new functionhub_runner with the updated configuration
                     if hasattr(agent, 'functionhub_runner'):
                         agent.functionhub_runner = FunctionHubRunner(config.functionhub)
-                    self.logger.info(f'Updated functionhub_runner for {agent.name}')
+                        self.logger.info(f'Updated functionhub_runner for {agent.name}')
+                    else:
+                        self.logger.info(
+                            f'No attribute named functionhub_runner found for {agent.name}'
+                        )
             except Exception as e:
                 self.logger.error(f'Error initializing FunctionHub: {e}')
 

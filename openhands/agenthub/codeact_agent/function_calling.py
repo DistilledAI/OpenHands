@@ -69,6 +69,7 @@ def response_to_actions(
     assistant_msg = choice.message
     if not function_hub_tools_names_to_tool_id:
         function_hub_tools_names_to_tool_id = {}
+    thought = ''
     if hasattr(assistant_msg, 'tool_calls') and assistant_msg.tool_calls:
         # Check if there's assistant_msg.content. If so, add it to the thought
         if isinstance(assistant_msg.content, str):

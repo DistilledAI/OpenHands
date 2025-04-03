@@ -281,16 +281,12 @@ class ActionExecutionClient(Runtime):
                         self.config.mcp.stdio.commands,
                         self.config.mcp.stdio.args,
                     )
-                if self.config.functionhub.function_hub_url:
-                    execution_action_body['function_hub_url'] = (
-                        self.config.functionhub.function_hub_url
-                    )
-                    execution_action_body['function_hub_wallet_address'] = (
-                        self.config.functionhub.function_hub_wallet_address
-                    )
-                    execution_action_body['function_hub_api_key'] = (
-                        self.config.functionhub.function_hub_api_key
-                    )
+                if self.config.functionhub:
+                    execution_action_body['functionhub_config'] = {
+                        'function_hub_url': self.config.functionhub.function_hub_url,
+                        'function_hub_wallet_address': self.config.functionhub.function_hub_wallet_address,
+                        'function_hub_api_key': self.config.functionhub.function_hub_api_key,
+                    }
 
                 with self._send_action_server_request(
                     'POST',

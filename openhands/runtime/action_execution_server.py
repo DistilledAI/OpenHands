@@ -82,7 +82,7 @@ class ActionRequest(BaseModel):
     action: dict
     sse_mcp_config: Optional[list[str]] = None
     stdio_mcp_config: Optional[tuple[list[str], list[list[str]]]] = None
-    functionhub_config: Optional[dict] = None
+    functionhub_config: Optional[dict[str, str]] = None
     caller_platform: str = 'Linux'
 
 
@@ -200,13 +200,8 @@ class ActionExecutor:
             in ['true', '1', 'yes']
         )
         self.memory_monitor.start_monitoring()
-        if self.functionhub_config is not None:
-            self.functionhub_runner = FunctionHubRunner(
-                FunctionHubConfig(**self.functionhub_config)
-            )
-        else:
-            # Either initialize with no config or with default values
-            self.functionhub_runner = FunctionHubRunner()
+        self.functionhub_config = FunctionHubConfig()
+        self.functionhub_runner = FunctionHubRunner(self.functionhub_config)
 
     @property
     def initial_cwd(self):
@@ -218,14 +213,18 @@ class ActionExecutor:
         self.stdio_mcp_config = action_request.stdio_mcp_config
         self.caller_platform = action_request.caller_platform
         # Update the functionhub_config if it is provided
-        self.functionhub_config = action_request.functionhub_config
-        if self.functionhub_config is not None:
-            self.functionhub_runner = FunctionHubRunner(
-                FunctionHubConfig(**self.functionhub_config)
+        if action_request.functionhub_config is not None:
+            self.functionhub_config = FunctionHubConfig(
+                **action_request.functionhub_config
             )
         else:
-            # Either initialize with no config or with default values
-            self.functionhub_runner = FunctionHubRunner()
+            self.functionhub_config = (
+                FunctionHubConfig()
+            )  # or a default FunctionHubConfig
+        self.functionhub_runner = FunctionHubRunner(
+            FunctionHubConfig(**self.functionhub_config)
+        )
+        logger.info(f'FunctionHub config in process_request: {self.functionhub_config}')
 
     async def _init_browser_async(self):
         """Initialize the browser asynchronously."""

@@ -20,6 +20,8 @@ class FunctionHubAction(Action):
         return (
             f'I am interacting with the Function Hub with name:\n'
             f'```\n{self.name}\n```\n'
+            f'and id_functionhub:\n'
+            f'```\n{self.id_functionhub}\n```\n'
             f'and arguments:\n'
             f'```\n{self.arguments}\n```'
         )
@@ -28,4 +30,7 @@ class FunctionHubAction(Action):
         ret = '**FunctionHubAction**\n'
         if self.thought:
             ret += f'THOUGHT: {self.thought}\n'
+        ret += f'NAME: {self.name}\n'
+        ret += f'ID_FUNCTIONHUB: {self.id_functionhub}\n'
+        ret += f'ARGUMENTS: {self.arguments}\n'
         return ret

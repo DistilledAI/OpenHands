@@ -210,6 +210,7 @@ class ActionExecutor:
         self.sse_mcp_servers = action_request.sse_mcp_config
         self.stdio_mcp_config = action_request.stdio_mcp_config
         self.caller_platform = action_request.caller_platform
+        # Update the functionhub_config if it is provided
         self.functionhub_config = action_request.functionhub_config
 
     async def _init_browser_async(self):
@@ -531,12 +532,15 @@ class ActionExecutor:
         return await browse(action, self.browser)
 
     async def call_tool_functionhub(self, action: FunctionHubAction) -> Observation:
+        if not self.functionhub_runner:
+            raise ValueError('FunctionHub runner not initialized')
         logger.debug(
             f'Calling tool functionhub: {action.name} ({action.id_functionhub})'
         )
         logger.debug(f'Caller platform: {self.caller_platform}')
         args_parsed = json.loads(action.arguments)
         response = await self.functionhub_runner.run(action.id_functionhub, args_parsed)
+        logger.info(f'FunctionHub response: {response}')
         return response
 
     async def call_tool_mcp(self, action: McpAction) -> Observation:

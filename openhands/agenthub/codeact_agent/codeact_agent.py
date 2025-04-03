@@ -5,6 +5,7 @@ import openhands.agenthub.codeact_agent.function_calling as codeact_function_cal
 from openhands.controller.agent import Agent
 from openhands.controller.state.state import State
 from openhands.core.config import AgentConfig
+from openhands.core.config.functionhub_config import FunctionHubConfig
 from openhands.core.logger import openhands_logger as logger
 from openhands.core.message import Message, TextContent
 from openhands.events.action import (
@@ -53,7 +54,11 @@ class CodeActAgent(Agent):
     ]
 
     def __init__(
-        self, llm: LLM, config: AgentConfig, mcp_tools: list[dict] | None = None
+        self,
+        llm: LLM,
+        config: AgentConfig,
+        mcp_tools: list[dict] | None = None,
+        function_hub_config: FunctionHubConfig | None = None,
     ) -> None:
         """Initializes a new instance of the CodeActAgent class.
 
@@ -145,14 +150,16 @@ class CodeActAgent(Agent):
             'tools': combined_tools,  # Use combined tools instead of just self.tools
         }
 
-        print(f'Params: {params}')
-
+        function_hub_tools_names_to_tool_id = {
+            tool['function']['name']: tool['id_functionhub']
+            for tool in function_hub_tools
+        }
         # log to litellm proxy if possible
         params['extra_body'] = {'metadata': state.to_llm_metadata(agent_name=self.name)}
         response = self.llm.completion(**params)
         logger.debug(f'Response from LLM: {response}')
         actions = codeact_function_calling.response_to_actions(
-            response, function_hub_tools
+            response, function_hub_tools_names_to_tool_id
         )
         logger.debug(f'Actions after response_to_actions: {actions}')
         for action in actions:

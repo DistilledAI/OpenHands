@@ -15,6 +15,7 @@ from openhands.events.action.files import (
     FileReadAction,
     FileWriteAction,
 )
+from openhands.events.action.functionhub import FunctionHubAction
 from openhands.events.action.mcp import McpAction
 from openhands.events.action.message import MessageAction
 
@@ -37,4 +38,5 @@ __all__ = [
     'AgentThinkAction',
     'RecallAction',
     'McpAction',
+    'FunctionHubAction',
 ]

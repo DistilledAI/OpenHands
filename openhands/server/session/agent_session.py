@@ -129,8 +129,17 @@ class AgentSession:
                 self.logger.info(
                     f'FunctionHub wallet address: {config.functionhub.function_hub_wallet_address}'
                 )
-                # self.logger.info(f'FunctionHub API key: {config.functionhub.function_hub_api_key}')
-
+                # Check if FunctionHub is needed for the agent
+                # if hasattr(agent, 'functionhub_runner'):
+                #     agent.function_hub_config = config.functionhub
+                #     self.logger.info(
+                #         f'FunctionHub config for {agent.name}: {agent.function_hub_config}'
+                #     )
+                #     # Create a new functionhub_runner with the updated configuration
+                #     agent.functionhub_runner = FunctionHubRunner(
+                #         agent.function_hub_config
+                #     )
+                #     self.logger.info(f'Updated functionhub_runner for {agent.name}')
                 # Check if MCP servers are available
                 if not config.mcp.sse.mcp_servers and not config.mcp.stdio.commands:
                     self.logger.warning(

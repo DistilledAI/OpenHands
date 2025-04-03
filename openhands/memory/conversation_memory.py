@@ -360,18 +360,22 @@ class ConversationMemory:
             text = obs.text_content
             if obs.image_urls:
                 text += f'Image response from function {obs.function_name}:\n'
+                for image_url in obs.image_urls:
+                    text += f'![Generated Image from tool {obs.function_name}]({image_url})\n'
             if obs.video_urls:
-                # TODO: add video content
-                pass
+                text += f'Video response from function {obs.function_name}:\n'
+                for video_url in obs.video_urls:
+                    text += f'![Generated Video from tool {obs.function_name}]({video_url})\n'
             if obs.audio_urls:
-                # TODO: add audio content
-                pass
+                text += f'Audio response from function {obs.function_name}:\n'
+                for audio_url in obs.audio_urls:
+                    text += f'![Generated Audio from tool {obs.function_name}]({audio_url})\n'
             if obs.blob:
-                # TODO: add blob content
-                pass
+                text += f'Blob response from function {obs.function_name}:\n'
+                text += f'![Generated Blob from tool {obs.function_name}]({obs.blob})\n'
             if obs.error:
-                # TODO: add error content
-                pass
+                text += f'Error response from function {obs.function_name}:\n'
+                text += f'{obs.error}\n'
             if len(obs.image_urls) > 0:
                 message = Message(
                     role='user',

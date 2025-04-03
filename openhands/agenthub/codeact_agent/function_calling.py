@@ -4,7 +4,7 @@ This is similar to the functionality of `CodeActResponseParser`.
 """
 
 import json
-from typing import Any, Optional
+from typing import Optional
 
 from litellm import (
     ChatCompletionToolParam,
@@ -43,7 +43,6 @@ from openhands.events.action.mcp import McpAction
 from openhands.events.event import FileEditSource, FileReadSource
 from openhands.events.tool import ToolCallMetadata
 from openhands.llm import LLM
-from openhands.runtime.run_functionhub import FunctionHubChatCompletionToolParam
 
 
 def combine_thought(action: Action, thought: str) -> Action:
@@ -58,7 +57,7 @@ def combine_thought(action: Action, thought: str) -> Action:
 
 def response_to_actions(
     response: ModelResponse,
-    function_hub_tools: Optional[list[FunctionHubChatCompletionToolParam]] = None,
+    function_hub_tools_names_to_tool_id: Optional[dict[str, str]] = None,
 ) -> list[Action]:
     """
     Convert a response from the LLM to a list of actions.
@@ -68,23 +67,19 @@ def response_to_actions(
     assert len(response.choices) == 1, 'Only one choice is supported for now'
     choice = response.choices[0]
     assistant_msg = choice.message
-    if function_hub_tools is None:
-        function_hub_tools = []
-    dicts_function_hub_tools = []
-    for tool in function_hub_tools:
-        if isinstance(tool, FunctionHubChatCompletionToolParam):
-            tool = tool.model_dump()
-        dicts_function_hub_tools.append(tool)
+    if not function_hub_tools_names_to_tool_id:
+        function_hub_tools_names_to_tool_id = {}
     if hasattr(assistant_msg, 'tool_calls') and assistant_msg.tool_calls:
         # Check if there's assistant_msg.content. If so, add it to the thought
-        thought = ''
         if isinstance(assistant_msg.content, str):
             thought = assistant_msg.content
         elif isinstance(assistant_msg.content, list):
             for msg in assistant_msg.content:
                 if msg['type'] == 'text':
                     thought += msg['text']
-
+        logger.info(
+            f'function_hub_tools_names_to_tool_id: {function_hub_tools_names_to_tool_id}'
+        )
         # Process each tool call to OpenHands action
         for i, tool_call in enumerate(assistant_msg.tool_calls):
             action: Action
@@ -97,10 +92,24 @@ def response_to_actions(
                 ) from e
 
             # ================================================
+            # FunctionHubTool
+            # ================================================
+            if tool_call.function.name in function_hub_tools_names_to_tool_id:
+                logger.info(f'FunctionHubTool in function_calling.py: {tool_call}')
+
+                action = FunctionHubAction(
+                    name=tool_call.function.name,
+                    arguments=tool_call.function.arguments,
+                    id_functionhub=function_hub_tools_names_to_tool_id[
+                        tool_call.function.name
+                    ],
+                )
+                logger.info(f'FunctionHubAction in function_calling.py: {action}')
+            # ================================================
             # CmdRunTool (Bash)
             # ================================================
-
-            if tool_call.function.name == create_cmd_run_tool()['function']['name']:
+            elif tool_call.function.name == create_cmd_run_tool()['function']['name']:
+                logger.info('Inside CmdRunTool')
                 if 'command' not in arguments:
                     raise FunctionCallValidationError(
                         f'Missing required argument "command" in tool call {tool_call.function.name}'
@@ -113,12 +122,14 @@ def response_to_actions(
             # IPythonTool (Jupyter)
             # ================================================
             elif tool_call.function.name == IPythonTool['function']['name']:
+                logger.info('Inside IPythonTool')
                 if 'code' not in arguments:
                     raise FunctionCallValidationError(
                         f'Missing required argument "code" in tool call {tool_call.function.name}'
                     )
                 action = IPythonRunCellAction(code=arguments['code'])
             elif tool_call.function.name == 'delegate_to_browsing_agent':
+                logger.info('Inside delegate_to_browsing_agent')
                 action = AgentDelegateAction(
                     agent='BrowsingAgent',
                     inputs=arguments,
@@ -128,6 +139,7 @@ def response_to_actions(
             # AgentFinishAction
             # ================================================
             elif tool_call.function.name == FinishTool['function']['name']:
+                logger.info('Inside AgentFinishAction')
                 action = AgentFinishAction(
                     final_thought=arguments.get('message', ''),
                     task_completed=arguments.get('task_completed', None),
@@ -137,6 +149,7 @@ def response_to_actions(
             # LLMBasedFileEditTool (LLM-based file editor, deprecated)
             # ================================================
             elif tool_call.function.name == LLMBasedFileEditTool['function']['name']:
+                logger.info('Inside LLMBasedFileEditTool')
                 if 'path' not in arguments:
                     raise FunctionCallValidationError(
                         f'Missing required argument "path" in tool call {tool_call.function.name}'
@@ -155,6 +168,7 @@ def response_to_actions(
                 tool_call.function.name
                 == create_str_replace_editor_tool()['function']['name']
             ):
+                logger.info('Inside create_str_replace_editor_tool')
                 if 'command' not in arguments:
                     raise FunctionCallValidationError(
                         f'Missing required argument "command" in tool call {tool_call.function.name}'
@@ -189,12 +203,14 @@ def response_to_actions(
             # AgentThinkAction
             # ================================================
             elif tool_call.function.name == ThinkTool['function']['name']:
+                logger.info('Inside AgentThinkAction')
                 action = AgentThinkAction(thought=arguments.get('thought', ''))
 
             # ================================================
             # BrowserTool
             # ================================================
             elif tool_call.function.name == BrowserTool['function']['name']:
+                logger.info('Inside BrowserTool')
                 if 'code' not in arguments:
                     raise FunctionCallValidationError(
                         f'Missing required argument "code" in tool call {tool_call.function.name}'
@@ -205,28 +221,13 @@ def response_to_actions(
             # WebReadTool (simplified browsing)
             # ================================================
             elif tool_call.function.name == WebReadTool['function']['name']:
+                logger.info('Inside WebReadTool')
                 if 'url' not in arguments:
                     raise FunctionCallValidationError(
                         f'Missing required argument "url" in tool call {tool_call.function.name}'
                     )
                 action = BrowseURLAction(url=arguments['url'])
-            # ================================================
-            # FunctionHubTool
-            # ================================================
-            elif tool_call.function.name in [
-                tool['name'] for tool in dicts_function_hub_tools
-            ]:
-                logger.debug(f'FunctionHubTool in function_calling.py: {tool_call}')
-                function_meatadata: dict[str, Any] = {}
-                for x in dicts_function_hub_tools:
-                    if x['name'] == tool_call.function.name:
-                        function_meatadata = x
 
-                action = FunctionHubAction(
-                    name=tool_call.function.name,
-                    arguments=tool_call.function.arguments,
-                    id_functionhub=function_meatadata['id_functionhub'],
-                )
             # ================================================
             # Other cases -> McpTool (MCP)
             # ================================================

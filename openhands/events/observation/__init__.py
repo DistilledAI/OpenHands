@@ -21,6 +21,7 @@ from openhands.events.observation.files import (
     FileReadObservation,
     FileWriteObservation,
 )
+from openhands.events.observation.functionhub import FunctionHubObservation
 from openhands.events.observation.observation import Observation
 from openhands.events.observation.reject import UserRejectObservation
 from openhands.events.observation.success import SuccessObservation
@@ -46,4 +47,5 @@ __all__ = [
     'RecallType',
     'MCPObservation',
     'PlaywrightMcpBrowserScreenshotObservation',
+    'FunctionHubObservation',
 ]

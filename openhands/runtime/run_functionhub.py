@@ -38,11 +38,18 @@ class FunctionHubChatCompletionToolParam(ChatCompletionToolParam):
 class FunctionHubRunner:
     def __init__(self):
         self.config: AppConfig = load_app_config()
+        self.config = self.config.functionhub
+
         self.function_hub_url = self.config.functionhub.function_hub_url
         self.function_hub_wallet_address = (
             self.config.functionhub.function_hub_wallet_address
         )
         self.function_hub_api_key = self.config.functionhub.function_hub_api_key
+
+        logger.info(
+            f'FunctionHubRunner config: {self.function_hub_url}, {self.function_hub_wallet_address}, {self.function_hub_api_key}`'
+        )
+
         self.headers = {
             'accept': 'application/json',
             'Content-Type': 'application/json',
@@ -51,7 +58,9 @@ class FunctionHubRunner:
 
     async def run(self, id_functionhub: str, arguments: dict) -> FunctionHubObservation:
         """Run a FunctionHub function and return an observation."""
+        logger.info(f'Running FunctionHub function: {id_functionhub}, {arguments}')
         responses = await self.execute_function(id_functionhub, arguments)
+        logger.info(f'Responses: {responses}')
 
         # Extract function name if available in the first response description
         function_name = ''
@@ -120,7 +129,12 @@ class FunctionHubRunner:
 
         # Join all text content with newlines
         combined_text_content = '\n'.join(text_contents)
-
+        logger.info(f'Combined text content: {combined_text_content}')
+        logger.info(f'Image urls: {image_urls}')
+        logger.info(f'Video urls: {video_urls}')
+        logger.info(f'Audio urls: {audio_urls}')
+        logger.info(f'Blob: {blob}')
+        logger.info(f'Error: {error}')
         # Create and return the observation
         observation = FunctionHubObservation(
             function_name=function_name,
@@ -133,13 +147,13 @@ class FunctionHubRunner:
             blob=blob,
             error=error,
         )
-
         return observation
 
     async def execute_function(
         self, id_functionhub: str, arguments: dict
     ) -> List[BaseFunctionHubResponse]:
         """Execute a function in FunctionHub and return the responses."""
+        logger.info(f'Executing FunctionHub function: {id_functionhub}, {arguments}')
         url = f'{self.function_hub_url}/v1/functions/execute-function'
 
         payload = {
@@ -165,6 +179,11 @@ class FunctionHubRunner:
                         ]
 
                     result = await response.json()
+
+                    if 'result' in result:
+                        result = result['result']
+                    else:
+                        logger.error(f'Unknown response format: {result}')
 
                     # Process and convert the result to BaseFunctionHubResponse objects
                     responses = []

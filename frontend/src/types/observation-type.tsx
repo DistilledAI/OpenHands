@@ -13,6 +13,8 @@ enum ObservationType {
 
   PLAYWRIGHT_MCP_BROWSER_SCREENSHOT = 'playwright_mcp_browser_screenshot',
 
+  FUNCTION_HUB = "functionhub",
+
   // The output of a command
   RUN = "run",
 

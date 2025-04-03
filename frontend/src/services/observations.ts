@@ -39,6 +39,13 @@ export function handleObservationMessage(message: ObservationMessage) {
         store.dispatch(setUrl(message.extras.url));
       }
       break;
+    case ObservationType.FUNCTION_HUB:
+      if (message.extras?.image_urls && Array.isArray(message.extras.image_urls)) {
+        console.log(message.extras?.image_urls);
+        store.dispatch(setScreenshotSrc(message.extras?.image_urls[0]));
+      }
+
+      break;
     case ObservationType.AGENT_STATE_CHANGED:
       store.dispatch(setCurrentAgentState(message.extras.agent_state));
       break;
@@ -229,6 +236,40 @@ export function handleObservationMessage(message: ObservationMessage) {
               url: String(message.extras.url || ""),
               screenshot: String(message.extras.screenshot || ""),
               trigger_by_action: String(message.extras.trigger_by_action || ""),
+            },
+          }),
+        );
+        break;
+        // observation: str = ObservationType.FUNCTION_HUB
+        // function_name: str = field(default='')
+        // id_functionhub: str = field(default='')
+        // text_content: str = field(default='')
+        // image_urls: List[str] = field(default_factory=list)
+        // video_urls: List[str] = field(default_factory=list)
+        // audio_urls: List[str] = field(default_factory=list)
+        // blob: str = field(default='')
+        // error: str = field(default='')
+
+      case ObservationType.FUNCTION_HUB:
+        store.dispatch(
+          addAssistantObservation({
+            ...baseObservation,
+            observation: ObservationType.FUNCTION_HUB,
+            extras: {
+              function_name: String(message.extras.function_name || ""),
+              id_functionhub: String(message.extras.id_functionhub || ""),
+              text_content: String(message.extras.text_content || ""),
+              image_urls: Array.isArray(message.extras.image_urls)
+                ? message.extras.image_urls
+                : [],
+              video_urls: Array.isArray(message.extras.video_urls)
+                ? message.extras.video_urls
+                : [],
+              audio_urls: Array.isArray(message.extras.audio_urls)
+                ? message.extras.audio_urls
+                : [],
+              blob: String(message.extras.blob || ""),
+              error: String(message.extras.error || ""),
             },
           }),
         );

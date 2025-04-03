@@ -25,6 +25,7 @@ from openhands.events.observation.files import (
     FileReadObservation,
     FileWriteObservation,
 )
+from openhands.events.observation.functionhub import FunctionHubObservation
 from openhands.events.observation.mcp import MCPObservation
 from openhands.events.observation.observation import Observation
 from openhands.events.observation.playwright_mcp import (
@@ -50,6 +51,7 @@ observations = (
     AgentThinkObservation,
     RecallObservation,
     MCPObservation,
+    FunctionHubObservation,
     PlaywrightMcpBrowserScreenshotObservation,
 )
 

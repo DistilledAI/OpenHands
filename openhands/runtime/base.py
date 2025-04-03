@@ -31,6 +31,7 @@ from openhands.events.action import (
     FileWriteAction,
     IPythonRunCellAction,
 )
+from openhands.events.action.functionhub import FunctionHubAction
 from openhands.events.action.mcp import McpAction
 from openhands.events.event import Event
 from openhands.events.observation import (
@@ -541,6 +542,10 @@ class Runtime(FileEditRuntimeMixin):
 
     @abstractmethod
     def call_tool_mcp(self, action: McpAction) -> Observation:
+        pass
+
+    @abstractmethod
+    def call_tool_functionhub(self, action: FunctionHubAction) -> Observation:
         pass
 
     # ====================================================================

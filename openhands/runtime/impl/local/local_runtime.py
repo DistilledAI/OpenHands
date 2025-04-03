@@ -303,7 +303,18 @@ class LocalRuntime(ActionExecutionClient):
                 response = await call_sync_from_async(
                     lambda: self.session.post(
                         f'{self.api_url}/execute_action',
-                        json={'action': event_to_dict(action)},
+                        json={
+                            'action': event_to_dict(action),
+                            'functionhub_config': self.config.functionhub.model_dump()
+                            if self.config.functionhub
+                            else None,
+                            'sse_mcp_config': self.config.mcp.sse.model_dump()
+                            if self.config.mcp.sse
+                            else None,
+                            'stdio_mcp_config': self.config.mcp.stdio.model_dump()
+                            if self.config.mcp.stdio
+                            else None,
+                        },
                     )
                 )
                 return observation_from_dict(response.json())

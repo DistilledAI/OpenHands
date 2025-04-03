@@ -24,6 +24,7 @@ from openhands.microagent.microagent import BaseMicroAgent
 from openhands.runtime import get_runtime_cls
 from openhands.runtime.base import Runtime
 from openhands.runtime.impl.remote.remote_runtime import RemoteRuntime
+from openhands.runtime.run_functionhub import FunctionHubRunner
 from openhands.security import SecurityAnalyzer, options
 from openhands.storage.files import FileStore
 from openhands.utils.async_utils import call_sync_from_async
@@ -121,8 +122,6 @@ class AgentSession:
                 self.logger.info(f'MCP SSE servers: {config.mcp.sse.mcp_servers}')
                 self.logger.info(f'MCP stdio commands: {config.mcp.stdio.commands}')
                 self.logger.info(f'MCP stdio args: {config.mcp.stdio.args}')
-
-                # Check if MCP servers are available
                 if not config.mcp.sse.mcp_servers and not config.mcp.stdio.commands:
                     self.logger.warning(
                         'No MCP servers or commands configured. MCP integration will not work.'
@@ -177,6 +176,32 @@ class AgentSession:
                     )
             except Exception as e:
                 self.logger.error(f'Error initializing MCP agents: {e}', exc_info=True)
+            # Initialize FunctionHub
+            try:
+                self.logger.info('Initializing FunctionHub')
+                if not config.functionhub:
+                    self.logger.warning('No FunctionHub configuration found')
+                else:
+                    self.logger.info(
+                        f'FunctionHub URL: {config.functionhub.function_hub_url}'
+                    )
+                    self.logger.info(
+                        f'FunctionHub wallet address: {config.functionhub.function_hub_wallet_address}'
+                    )
+                    self.logger.info(
+                        f'FunctionHub API key: {config.functionhub.function_hub_api_key}'
+                    )
+
+                    # Create a new functionhub_runner with the updated configuration
+                    if hasattr(agent, 'functionhub_runner'):
+                        agent.functionhub_runner = FunctionHubRunner(config.functionhub)
+                        self.logger.info(f'Updated functionhub_runner for {agent.name}')
+                    else:
+                        self.logger.info(
+                            f'No attribute named functionhub_runner found for {agent.name}'
+                        )
+            except Exception as e:
+                self.logger.error(f'Error initializing FunctionHub: {e}')
 
             self._create_security_analyzer(config.security.security_analyzer)
             runtime_connected = await self._create_runtime(

@@ -119,6 +119,21 @@ export interface PlaywrightMcpBrowserScreenshotObservation
     trigger_by_action: string;
   };
 }
+
+export interface FunctionHubObservation
+  extends OpenHandsObservationEvent<ObservationType.FUNCTION_HUB> {
+  source: "agent";
+  extras: {
+    function_name: string;
+    id_functionhub: string;
+    text_content: string;
+    image_urls: string[];
+    video_urls: string[];
+    audio_urls: string[];
+    blob: string;
+    error: string;
+  };
+}
 export type OpenHandsObservation =
   | AgentStateChangeObservation
   | AgentThinkObservation
@@ -131,4 +146,5 @@ export type OpenHandsObservation =
   | ReadObservation
   | EditObservation
   | ErrorObservation
-  | PlaywrightMcpBrowserScreenshotObservation;
+  | PlaywrightMcpBrowserScreenshotObservation
+  | FunctionHubObservation;

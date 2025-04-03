@@ -12,6 +12,7 @@ from openhands.core.config.config_utils import (
     model_defaults_to_dict,
 )
 from openhands.core.config.extended_config import ExtendedConfig
+from openhands.core.config.functionhub_config import FunctionHubConfig
 from openhands.core.config.llm_config import LLMConfig
 from openhands.core.config.mcp_config import MCPConfig
 from openhands.core.config.sandbox_config import SandboxConfig
@@ -51,6 +52,7 @@ class AppConfig(BaseModel):
         cli_multiline_input: Whether to enable multiline input in CLI. When disabled,
             input is read line by line. When enabled, input continues until /exit command.
         mcp: MCP configuration settings.
+        functionhub: Function Hub configuration settings.
     """
 
     enable_planning: bool = Field(default=False)
@@ -96,6 +98,7 @@ class AppConfig(BaseModel):
         default=3
     )  # Maximum number of concurrent agent loops allowed per user
     mcp: MCPConfig = Field(default_factory=MCPConfig)
+    functionhub: FunctionHubConfig = Field(default_factory=FunctionHubConfig)
 
     defaults_dict: ClassVar[dict] = {}
 
@@ -149,3 +152,5 @@ class AppConfig(BaseModel):
             self.mcp.sse.validate_servers()
         if self.mcp.stdio.commands:
             self.mcp.stdio.validate_stdio()
+        if self.functionhub.function_hub_url:
+            self.functionhub.validate_function_hub_url()

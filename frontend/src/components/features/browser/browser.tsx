@@ -7,11 +7,16 @@ export function BrowserPanel() {
   const { url, screenshotSrc } = useSelector(
     (state: RootState) => state.browser,
   );
-
-  const imgSrc =
-    screenshotSrc && screenshotSrc.startsWith("data:image/png;base64,")
-      ? screenshotSrc
-      : `data:image/png;base64,${screenshotSrc || ""}`;
+  let imgSrc = "";
+  if (screenshotSrc){
+    if (screenshotSrc.startsWith("http")) {
+      imgSrc = screenshotSrc;
+    } else if (screenshotSrc.startsWith("data:image/png;base64,")) {
+      imgSrc = screenshotSrc;
+    } else {
+      imgSrc = `data:image/png;base64,${screenshotSrc}`;
+    }
+  }
 
   return (
     <div className="h-full w-full flex flex-col text-neutral-400">

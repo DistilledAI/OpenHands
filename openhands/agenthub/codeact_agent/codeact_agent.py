@@ -5,6 +5,7 @@ import openhands.agenthub.codeact_agent.function_calling as codeact_function_cal
 from openhands.controller.agent import Agent
 from openhands.controller.state.state import State
 from openhands.core.config import AgentConfig
+from openhands.core.config.functionhub_config import FunctionHubConfig
 from openhands.core.logger import openhands_logger as logger
 from openhands.core.message import Message, TextContent
 from openhands.events.action import (
@@ -19,6 +20,7 @@ from openhands.runtime.plugins import (
     JupyterRequirement,
     PluginRequirement,
 )
+from openhands.runtime.run_functionhub import FunctionHubRunner
 from openhands.utils.prompt import PromptManager
 
 
@@ -52,7 +54,11 @@ class CodeActAgent(Agent):
     ]
 
     def __init__(
-        self, llm: LLM, config: AgentConfig, mcp_tools: list[dict] | None = None
+        self,
+        llm: LLM,
+        config: AgentConfig,
+        mcp_tools: list[dict] | None = None,
+        function_hub_config: FunctionHubConfig | None = None,
     ) -> None:
         """Initializes a new instance of the CodeActAgent class.
 
@@ -60,6 +66,7 @@ class CodeActAgent(Agent):
         - llm (LLM): The llm to be used by this agent
         - config (AgentConfig): The configuration for this agent
         - mcp_tools (list[dict] | None, optional): List of MCP tools to be used by this agent. Defaults to None.
+        - function_hub_config (FunctionHubConfig | None, optional): The configuration for the FunctionHub to be used by this agent. Defaults to None.
         """
         super().__init__(llm, config, mcp_tools)
         self.pending_actions: deque[Action] = deque()
@@ -87,6 +94,7 @@ class CodeActAgent(Agent):
         self.conversation_memory = ConversationMemory(self.config, self.prompt_manager)
 
         self.condenser = Condenser.from_config(self.config.condenser)
+        self.functionhub_runner = FunctionHubRunner(function_hub_config)
         logger.debug(f'Using condenser: {type(self.condenser)}')
 
     def reset(self) -> None:
@@ -119,19 +127,93 @@ class CodeActAgent(Agent):
 
         # prepare what we want to send to the LLM
         messages = self._get_messages(state)
+
+        # Extract the current plan state and step from the messages and state
+        current_plan_state = self._extract_plan_state(state, messages)
+        current_step = self._extract_current_step(state)
+        logger.info(f'Current plan state: {current_plan_state}')
+        logger.info(f'Current step: {current_step}')
+
+        logger.info('Searching for additional tools from Function Hub for current task')
+        # Use search_tool to get additional tools based on current plan and step
+        function_hub_tools = self.functionhub_runner.search_with_rerank(
+            current_plan_state, current_step
+        )
+
+        logger.info(
+            f'Found {len(function_hub_tools)} additional tools from Function Hub for current task'
+        )
+
+        # Combine base tools with the dynamically found tools
+        combined_tools = self.tools + function_hub_tools
+
         params: dict = {
             'messages': self.llm.format_messages_for_llm(messages),
+            'tools': combined_tools,  # Use combined tools instead of just self.tools
         }
-        params['tools'] = self.tools
+
+        function_hub_tools_names_to_tool_id = {
+            tool['function']['name']: tool['id_functionhub']
+            for tool in function_hub_tools
+        }
         # log to litellm proxy if possible
         params['extra_body'] = {'metadata': state.to_llm_metadata(agent_name=self.name)}
         response = self.llm.completion(**params)
         logger.debug(f'Response from LLM: {response}')
-        actions = codeact_function_calling.response_to_actions(response)
+        actions = codeact_function_calling.response_to_actions(
+            response, function_hub_tools_names_to_tool_id
+        )
         logger.debug(f'Actions after response_to_actions: {actions}')
         for action in actions:
             self.pending_actions.append(action)
         return self.pending_actions.popleft()
+
+    def _extract_plan_state(self, state: State, messages: list[Message]) -> str:
+        """Extract the current state of the plan from the state object and messages.
+
+        Parameters:
+        - state (State): The current state
+        - messages (list[Message]): Processed messages for the LLM
+
+        Returns:
+        - str: A string describing the current state of the plan
+        """
+        # Try to get plan state from extra_data if it exists
+        if 'plan_state' in state.extra_data:
+            return state.extra_data['plan_state']
+
+        # Or try to infer it from recent history
+        current_intent, _ = state.get_current_user_intent()
+        last_agent_message = state.get_last_agent_message()
+
+        plan_state = f"User intent: {current_intent if current_intent else 'Unknown'}"
+
+        if last_agent_message:
+            plan_state += (
+                f'\nLast agent response: {last_agent_message.content[:200]}...'
+            )
+
+        # Add task information if available
+        if state.root_task and hasattr(state.root_task, 'description'):
+            plan_state += f'\nTask: {state.root_task.description}'
+
+        return plan_state
+
+    def _extract_current_step(self, state: State) -> str:
+        """Extract the current step from the state object.
+
+        Parameters:
+        - state (State): The current state
+
+        Returns:
+        - str: A string describing the current step
+        """
+        # Try to get current step from extra_data if it exists
+        if 'current_step' in state.extra_data:
+            return state.extra_data['current_step']
+
+        # Or infer it from the current iteration
+        return f'Step {state.local_iteration} of task'
 
     def _get_messages(self, state: State) -> list[Message]:
         """Constructs the message history for the LLM conversation.

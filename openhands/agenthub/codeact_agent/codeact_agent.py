@@ -66,6 +66,7 @@ class CodeActAgent(Agent):
         - llm (LLM): The llm to be used by this agent
         - config (AgentConfig): The configuration for this agent
         - mcp_tools (list[dict] | None, optional): List of MCP tools to be used by this agent. Defaults to None.
+        - function_hub_config (FunctionHubConfig | None, optional): The configuration for the FunctionHub to be used by this agent. Defaults to None.
         """
         super().__init__(llm, config, mcp_tools)
         self.pending_actions: deque[Action] = deque()
@@ -92,7 +93,7 @@ class CodeActAgent(Agent):
         self.conversation_memory = ConversationMemory(self.config, self.prompt_manager)
 
         self.condenser = Condenser.from_config(self.config.condenser)
-        self.functionhub_runner = FunctionHubRunner()
+        self.functionhub_runner = FunctionHubRunner(function_hub_config)
         logger.debug(f'Using condenser: {type(self.condenser)}')
 
     def reset(self) -> None:

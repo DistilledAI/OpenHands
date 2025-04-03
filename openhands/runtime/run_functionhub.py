@@ -7,8 +7,7 @@ import aiohttp
 from litellm import ChatCompletionToolParam, ChatCompletionToolParamFunctionChunk
 from pydantic import BaseModel, Field
 
-from openhands.core.config.app_config import AppConfig
-from openhands.core.config.utils import load_app_config
+from openhands.core.config.functionhub_config import FunctionHubConfig
 from openhands.core.logger import openhands_logger as logger
 from openhands.events.observation.functionhub import FunctionHubObservation
 
@@ -36,18 +35,22 @@ class FunctionHubChatCompletionToolParam(ChatCompletionToolParam):
 
 
 class FunctionHubRunner:
-    def __init__(self):
-        self.config: AppConfig = load_app_config()
-        self.config = self.config.functionhub
+    def __init__(self, config: FunctionHubConfig | None = None):
+        self.config = config
 
-        self.function_hub_url = self.config.functionhub.function_hub_url
-        self.function_hub_wallet_address = (
-            self.config.functionhub.function_hub_wallet_address
-        )
-        self.function_hub_api_key = self.config.functionhub.function_hub_api_key
+        # Initialize default values
+        self.function_hub_url = None
+        self.function_hub_wallet_address = None
+        self.function_hub_api_key = None
+
+        # Only access config attributes if config is not None
+        if self.config is not None:
+            self.function_hub_url = self.config.function_hub_url
+            self.function_hub_wallet_address = self.config.function_hub_wallet_address
+            self.function_hub_api_key = self.config.function_hub_api_key
 
         logger.info(
-            f'FunctionHubRunner config: {self.function_hub_url}, {self.function_hub_wallet_address}, {self.function_hub_api_key}`'
+            f'FunctionHubRunner config: {self.function_hub_url}, {self.function_hub_wallet_address}, {self.function_hub_api_key}'
         )
 
         self.headers = {

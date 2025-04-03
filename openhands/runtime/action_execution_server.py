@@ -34,6 +34,7 @@ from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from uvicorn import run
 
+from openhands.core.config.functionhub_config import FunctionHubConfig
 from openhands.core.exceptions import BrowserUnavailableException
 from openhands.core.logger import openhands_logger as logger
 from openhands.core.setup import create_mcp_agents
@@ -199,7 +200,13 @@ class ActionExecutor:
             in ['true', '1', 'yes']
         )
         self.memory_monitor.start_monitoring()
-        self.functionhub_runner = FunctionHubRunner()
+        if self.functionhub_config is not None:
+            self.functionhub_runner = FunctionHubRunner(
+                FunctionHubConfig(**self.functionhub_config)
+            )
+        else:
+            # Either initialize with no config or with default values
+            self.functionhub_runner = FunctionHubRunner()
 
     @property
     def initial_cwd(self):
@@ -212,6 +219,13 @@ class ActionExecutor:
         self.caller_platform = action_request.caller_platform
         # Update the functionhub_config if it is provided
         self.functionhub_config = action_request.functionhub_config
+        if self.functionhub_config is not None:
+            self.functionhub_runner = FunctionHubRunner(
+                FunctionHubConfig(**self.functionhub_config)
+            )
+        else:
+            # Either initialize with no config or with default values
+            self.functionhub_runner = FunctionHubRunner()
 
     async def _init_browser_async(self):
         """Initialize the browser asynchronously."""

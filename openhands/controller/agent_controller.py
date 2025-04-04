@@ -1,7 +1,6 @@
 import asyncio
 import copy
 import os
-import traceback
 from typing import Callable, ClassVar, Type
 
 import litellm  # noqa
@@ -258,11 +257,11 @@ class AgentController:
         try:
             await self._step()
         except Exception as e:
-            self.log(
-                'error',
-                f'Error while running the agent (session ID: {self.id}): {e}. '
-                f'Traceback: {traceback.format_exc()}',
-            )
+            # self.log(
+            #     'error',
+            #     f'Error while running the agent (session ID: {self.id}): {e}. '
+            #     f'Traceback: {traceback.format_exc()}',
+            # )
             reported = RuntimeError(
                 f'There was an unexpected error while running the agent: {e.__class__.__name__}. You can refresh the page or ask the agent to try again.'
             )
@@ -375,19 +374,18 @@ class AgentController:
             await self._handle_message_action(action)
         elif isinstance(action, AgentDelegateAction):
             logger.info(f'Starting delegate {action.agent}')
-            if self.delegate is None:
-                self.delegate = await self.start_delegate(action)
-                assert self.delegate is not None
+            self.delegate = await self.start_delegate(action)
+            assert self.delegate is not None
 
-                # Post a MessageAction with the task for the delegate
-                if 'task' in action.inputs:
-                    self.event_stream.add_event(
-                        MessageAction(
-                            content='TASK: ' + action.inputs['task'], displayable=False
-                        ),
-                        EventSource.USER,
-                    )
-                    await self.delegate.set_agent_state_to(AgentState.RUNNING)
+            # Post a MessageAction with the task for the delegate
+            if 'task' in action.inputs:
+                self.event_stream.add_event(
+                    MessageAction(
+                        content='TASK: ' + action.inputs['task'], displayable=False
+                    ),
+                    EventSource.USER,
+                )
+                await self.delegate.set_agent_state_to(AgentState.RUNNING)
             return
 
         elif isinstance(action, AgentFinishAction):

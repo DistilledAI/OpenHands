@@ -22,6 +22,7 @@ from openhands.core.config.config_utils import (
     OH_MAX_ITERATIONS,
 )
 from openhands.core.config.extended_config import ExtendedConfig
+from openhands.core.config.functionhub_config import FunctionHubConfig
 from openhands.core.config.llm_config import LLMConfig
 from openhands.core.config.mcp_config import MCPConfig
 from openhands.core.config.sandbox_config import SandboxConfig
@@ -248,6 +249,23 @@ def load_from_toml(cfg: AppConfig, toml_file: str = 'config.toml') -> None:
             # Re-raise ValueError from MCPConfig.from_toml_section
             raise ValueError('Error in MCP sections in config.toml')
 
+    # Process functionhub section if present
+    if 'functionhub' in toml_config:
+        print('FunctionHub config found in config.toml')
+        try:
+            functionhub_mapping = FunctionHubConfig.from_toml_section(
+                toml_config['functionhub']
+            )
+            # We only use the base functionhub config for now
+            if 'functionhub' in functionhub_mapping:
+                cfg.functionhub = functionhub_mapping['functionhub']
+        except (TypeError, KeyError, ValidationError) as e:
+            logger.openhands_logger.warning(
+                f'Cannot parse [functionhub] config from toml, values have not been applied.\nError: {e}'
+            )
+        except ValueError:
+            # Re-raise ValueError from FunctionHubConfig.from_toml_section
+            raise ValueError('Error in [functionhub] section in config.toml')
     # Process condenser section if present
     if 'condenser' in toml_config:
         try:
@@ -307,6 +325,7 @@ def load_from_toml(cfg: AppConfig, toml_file: str = 'config.toml') -> None:
         'condenser',
         'mcp-sse',
         'mcp-stdio',
+        'functionhub',
     }
     for key in toml_config:
         if key.lower() not in known_sections:

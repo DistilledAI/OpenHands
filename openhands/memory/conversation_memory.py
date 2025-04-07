@@ -22,6 +22,7 @@ from openhands.events.action import (
     IPythonRunCellAction,
     MessageAction,
 )
+from openhands.events.action.functionhub import FunctionHubAction
 from openhands.events.action.mcp import McpAction
 from openhands.events.event import Event, RecallType
 from openhands.events.observation import (
@@ -40,6 +41,7 @@ from openhands.events.observation.agent import (
     RecallObservation,
 )
 from openhands.events.observation.error import ErrorObservation
+from openhands.events.observation.functionhub import FunctionHubObservation
 from openhands.events.observation.mcp import MCPObservation
 from openhands.events.observation.observation import Observation
 from openhands.events.observation.playwright_mcp import (
@@ -178,6 +180,7 @@ class ConversationMemory:
                 - AgentFinishAction: For ending the interaction
                 - MessageAction: For sending messages
                 - McpAction: For interacting with the MCP server
+                - FunctionHubAction: For interacting with the Function Hub
             pending_tool_call_action_messages: Dictionary mapping response IDs to their corresponding messages.
                 Used in function calling mode to track tool calls that are waiting for their results.
 
@@ -204,6 +207,7 @@ class ConversationMemory:
                 BrowseInteractiveAction,
                 BrowseURLAction,
                 McpAction,
+                FunctionHubAction,
             ),
         ) or (isinstance(action, CmdRunAction) and action.source == 'agent'):
             tool_metadata = action.tool_call_metadata
@@ -394,6 +398,39 @@ class ConversationMemory:
                     TextContent(text=text),
                 ],
             )
+        elif isinstance(obs, FunctionHubObservation):
+            text = obs.text_content
+            if obs.image_urls:
+                text += f'Image response from function {obs.function_name}:\n'
+                for image_url in obs.image_urls:
+                    text += f'![Generated Image from tool {obs.function_name}]({image_url})\n'
+            if obs.video_urls:
+                text += f'Video response from function {obs.function_name}:\n'
+                for video_url in obs.video_urls:
+                    text += f'![Generated Video from tool {obs.function_name}]({video_url})\n'
+            if obs.audio_urls:
+                text += f'Audio response from function {obs.function_name}:\n'
+                for audio_url in obs.audio_urls:
+                    text += f'![Generated Audio from tool {obs.function_name}]({audio_url})\n'
+            if obs.blob:
+                text += f'Blob response from function {obs.function_name}:\n'
+                text += f'![Generated Blob from tool {obs.function_name}]({obs.blob})\n'
+            if obs.error:
+                text += f'Error response from function {obs.function_name}:\n'
+                text += f'{obs.error}\n'
+            if len(obs.image_urls) > 0:
+                message = Message(
+                    role='user',
+                    content=[
+                        TextContent(text=text),
+                        ImageContent(image_urls=obs.image_urls),
+                    ],
+                )
+            else:
+                message = Message(
+                    role='user',
+                    content=[TextContent(text=text)],
+                )
         elif isinstance(obs, IPythonRunCellObservation):
             text = obs.content
             # replace base64 images with a placeholder

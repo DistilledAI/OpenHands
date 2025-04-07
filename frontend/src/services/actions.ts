@@ -37,6 +37,11 @@ const messageActions = {
       store.dispatch(addAssistantMessage(message.message));
     }
   },
+  [ActionType.FUNCTION_HUB]: (message: ActionMessage) => {
+    if (!message.args.thought && message.message) {
+      store.dispatch(addAssistantMessage(message.message));
+    }
+  },
   [ActionType.WRITE]: (message: ActionMessage) => {
     const { path, content } = message.args;
     store.dispatch(setActiveFilepath(path));

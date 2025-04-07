@@ -47,6 +47,8 @@ enum ActionType {
 
   // Take a screenshot of the browser
   MASK_TASK = "mask_task",
+  // Run a function
+  FUNCTION_HUB = "functionhub",
 }
 
 export default ActionType;

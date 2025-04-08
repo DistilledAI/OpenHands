@@ -109,8 +109,9 @@ class TaskSolvingAgent(Agent):
         params['extra_body'] = {'metadata': state.to_llm_metadata(agent_name=self.name)}
         try:
             response = self.llm.completion(**params)
-        except Exception:
+        except Exception as e:
             logger.warning(f"Error in LLM completion: {params['messages']}")
+            raise e
 
         logger.debug(f'Response from LLM: {response}')
         actions = task_solving_function_calling.response_to_actions(response)

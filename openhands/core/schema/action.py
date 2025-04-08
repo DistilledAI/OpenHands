@@ -42,6 +42,10 @@ class ActionType(str, Enum):
     """Interact with the MCP server.
     """
 
+    RAG = 'query_rag'
+    """Get most relevant information to the query.
+    """
+
     DELEGATE = 'delegate'
     """Delegates a task to another agent.
     """

@@ -20,10 +20,16 @@ from pathlib import Path
 from typing import Optional
 from zipfile import ZipFile
 
+import numpy as np
 from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import APIKeyHeader
+from lightrag import LightRAG, QueryParam
+from lightrag.kg.shared_storage import initialize_pipeline_status
+from lightrag.llm.jina import jina_embed
+from lightrag.llm.openai import openai_complete_if_cache
+from lightrag.utils import EmbeddingFunc
 from mcp.types import ImageContent
 from openhands_aci.editor.editor import OHEditor
 from openhands_aci.editor.exceptions import ToolError
@@ -48,6 +54,7 @@ from openhands.events.action import (
     IPythonRunCellAction,
 )
 from openhands.events.action.mcp import McpAction
+from openhands.events.action.rag import RAGAction
 from openhands.events.event import FileEditSource, FileReadSource
 from openhands.events.observation import (
     CmdOutputObservation,
@@ -79,6 +86,7 @@ class ActionRequest(BaseModel):
     action: dict
     sse_mcp_config: Optional[list[str]] = None
     stdio_mcp_config: Optional[tuple[list[str], list[list[str]]]] = None
+    rag_config: Optional[dict]
     caller_platform: str = 'Linux'
 
 
@@ -86,6 +94,7 @@ ROOT_GID = 0
 
 SESSION_API_KEY = os.environ.get('SESSION_API_KEY')
 api_key_header = APIKeyHeader(name='X-Session-API-Key', auto_error=False)
+EMBEDDING_MAX_TOKEN_SIZE = 8192
 
 
 def verify_api_key(api_key: str = Depends(api_key_header)):
@@ -146,6 +155,54 @@ def _execute_file_editor(
     return result.output, (result.old_content, result.new_content)
 
 
+def _embedding_func(texts: list[str], api_key: str) -> np.ndarray:
+    return jina_embed(
+        texts,
+        # model=os.getenv("JINA_ENCODER_INFERENCE_MODEL"),
+        api_key=api_key,
+        # base_url=f"{os.getenv("JINA_ENCODER_INFERENCE_ENDPOINT")}/v1/embedding"
+    )
+
+
+# async def get_embedding_dimension():
+#     test_text = ['This is a test sentence.']
+#     embedding = await _embedding_func(test_text)
+#     return embedding.shape[1]
+
+
+# async def create_embedding_function_instance():
+#     # Get embedding dimension
+#     global EMBEDDING_MAX_TOKEN_SIZE
+#     embedding_dimension = await get_embedding_dimension()
+#     # Create embedding function instance
+#     return EmbeddingFunc(
+#         embedding_dim=embedding_dimension,
+#         max_token_size=EMBEDDING_MAX_TOKEN_SIZE,
+#         func=_embedding_func,
+#     )
+
+
+def _llm_model_func(
+    prompt,
+    summarizer,
+    api_key,
+    base_url,
+    system_prompt=None,
+    # history_messages=[],
+    keyword_extraction=False,
+    **kwargs,
+) -> str:
+    return openai_complete_if_cache(
+        summarizer,
+        prompt,
+        system_prompt=system_prompt,
+        # history_messages=history_messages,
+        api_key=api_key,
+        base_url=base_url,
+        **kwargs,
+    )
+
+
 class ActionExecutor:
     """ActionExecutor is running inside docker sandbox.
     It is responsible for executing actions received from OpenHands backend and producing observations.
@@ -197,6 +254,8 @@ class ActionExecutor:
         )
         self.memory_monitor.start_monitoring()
 
+        self.rag: LightRAG
+
     @property
     def initial_cwd(self):
         return self._initial_cwd
@@ -205,6 +264,46 @@ class ActionExecutor:
         # update the sse_mcp_servers and stdio_mcp_config to prepare for MCP action if needed
         self.sse_mcp_servers = action_request.sse_mcp_config
         self.stdio_mcp_config = action_request.stdio_mcp_config
+
+        self.rag_config = (
+            action_request.rag_config if action_request.rag_config else dict()
+        )
+        if self.rag_config:
+
+            async def init_rag(self):
+                async def get_embedding_dim():
+                    test_text = ['This is a test sentence.']
+                    embedding = await _embedding_func(
+                        test_text, api_key=self.rag_config['key']
+                    )
+                    embedding_dim = embedding.shape[1]
+                    print(f'{embedding_dim=}')
+                    return embedding_dim
+
+                embedding_dimension = await get_embedding_dim()
+
+                self.rag = LightRAG(
+                    working_dir=self.rag_config['default_rag_dir'],
+                    llm_model_func=_llm_model_func,
+                    embedding_func=EmbeddingFunc(
+                        embedding_dim=embedding_dimension,
+                        max_token_size=self.rag_config['embedding_max_token_size'],
+                        func=_embedding_func,
+                    ),
+                    vector_storage='ChromaVectorDBStorage',
+                    vector_db_storage_cls_kwargs={
+                        'host': 'host.docker.internal',
+                        'port': '1259',
+                    },
+                )
+                await self.rag.initialize_storages()
+                await initialize_pipeline_status()
+
+            init_rag(self)
+
+        else:
+            self.rag_config = dict()
+
         self.caller_platform = action_request.caller_platform
 
     async def _init_browser_async(self):
@@ -608,6 +707,21 @@ class ActionExecutor:
             trigger_by_action=action.name,
             screenshot=f'data:image/png;base64,{screenshot_content.data}',
         )
+
+    async def query_rag(self, action: RAGAction) -> Observation:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: self.rag.query(
+                action.query,
+                param=QueryParam(
+                    mode=self.rag_config.get('mode', 'hybrid'),
+                    only_need_context=self.rag_config['only_need_context'],
+                    top_k=self.rag_config['top_k'],
+                ),
+            ),
+        )
+        return result
 
     def close(self):
         self.memory_monitor.stop_monitoring()

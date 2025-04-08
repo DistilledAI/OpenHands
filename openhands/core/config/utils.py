@@ -24,6 +24,7 @@ from openhands.core.config.config_utils import (
 from openhands.core.config.extended_config import ExtendedConfig
 from openhands.core.config.llm_config import LLMConfig
 from openhands.core.config.mcp_config import MCPConfig
+from openhands.core.config.rag_config import RAGConfig
 from openhands.core.config.sandbox_config import SandboxConfig
 from openhands.core.config.security_config import SecurityConfig
 from openhands.storage import get_file_store
@@ -224,6 +225,18 @@ def load_from_toml(cfg: AppConfig, toml_file: str = 'config.toml') -> None:
             # Re-raise ValueError from MCPConfig.from_toml_section
             raise ValueError('Error in MCP sections in config.toml')
 
+    # Process rag if present
+    if 'rag' in toml_config:
+        try:
+            cfg.rag = RAGConfig.from_toml_section(toml_config['rag'])
+        except (TypeError, KeyError, ValidationError) as e:
+            logger.openhands_logger.warning(
+                f'Cannot parse [rag] config from toml, values have not been applied.\nError: {e}'
+            )
+        except ValueError:
+            # Re-raise ValueError from RAGConfig
+            raise ValueError('Error in [rag] section in config.toml')
+
     # Process condenser section if present
     if 'condenser' in toml_config:
         try:
@@ -283,6 +296,7 @@ def load_from_toml(cfg: AppConfig, toml_file: str = 'config.toml') -> None:
         'condenser',
         'mcp-sse',
         'mcp-stdio',
+        'rag',
     }
     for key in toml_config:
         if key.lower() not in known_sections:

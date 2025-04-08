@@ -28,6 +28,7 @@ from openhands.events.action import (
 from openhands.events.action.action import Action
 from openhands.events.action.files import FileEditSource
 from openhands.events.action.mcp import McpAction
+from openhands.events.action.rag import RAGAction
 from openhands.events.observation import (
     AgentThinkObservation,
     ErrorObservation,
@@ -280,6 +281,11 @@ class ActionExecutionClient(Runtime):
                         self.config.mcp.stdio.commands,
                         self.config.mcp.stdio.args,
                     )
+                print(self.config.rag)
+                if self.config.rag['rag'].default_rag_dir:
+                    # Ensure no coroutine objects are included in the serialized data
+                    rag_config_dict = self.config.rag['rag'].dict()
+                    execution_action_body['rag_config'] = rag_config_dict
 
                 with self._send_action_server_request(
                     'POST',
@@ -319,6 +325,9 @@ class ActionExecutionClient(Runtime):
         return self.send_action_for_execution(action)
 
     def call_tool_mcp(self, action: McpAction) -> Observation:
+        return self.send_action_for_execution(action)
+
+    def query_rag(self, action: RAGAction) -> Observation:
         return self.send_action_for_execution(action)
 
     def close(self) -> None:

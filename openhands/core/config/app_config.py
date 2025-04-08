@@ -12,6 +12,7 @@ from openhands.core.config.config_utils import (
 from openhands.core.config.extended_config import ExtendedConfig
 from openhands.core.config.llm_config import LLMConfig
 from openhands.core.config.mcp_config import MCPConfig
+from openhands.core.config.rag_config import RAGConfig
 from openhands.core.config.sandbox_config import SandboxConfig
 from openhands.core.config.security_config import SecurityConfig
 
@@ -91,6 +92,7 @@ class AppConfig(BaseModel):
         default=3
     )  # Maximum number of concurrent agent loops allowed per user
     mcp: MCPConfig = Field(default_factory=MCPConfig)
+    rag: dict[str, 'RAGConfig'] = Field(default_factory=dict[str, 'RAGConfig'])
 
     defaults_dict: ClassVar[dict] = {}
 

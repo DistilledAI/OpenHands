@@ -38,6 +38,7 @@ from openhands.events.action import (
     MessageAction,
 )
 from openhands.events.action.mcp import McpAction
+from openhands.events.action.rag import RAGAction
 from openhands.events.event import FileEditSource, FileReadSource
 from openhands.events.tool import ToolCallMetadata
 from openhands.llm import LLM
@@ -193,7 +194,17 @@ def response_to_actions(response: ModelResponse) -> list[Action]:
                         f'Missing required argument "url" in tool call {tool_call.function.name}'
                     )
                 action = BrowseURLAction(url=arguments['url'])
-
+            # ================================================
+            # RAGTool (RAG)
+            # ================================================
+            elif tool_call.function.name == 'rag':
+                if 'query' not in arguments:
+                    raise FunctionCallValidationError(
+                        f'Missing required argument "query" in tool call {tool_call.function.name}'
+                    )
+                action = RAGAction(
+                    query=arguments['query'],
+                )
             # ================================================
             # Other cases -> McpTool (MCP)
             # ================================================

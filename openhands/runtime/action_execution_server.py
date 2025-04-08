@@ -221,9 +221,7 @@ class ActionExecutor:
             self.functionhub_config = (
                 FunctionHubConfig()
             )  # or a default FunctionHubConfig
-        self.functionhub_runner = FunctionHubRunner(
-            FunctionHubConfig(**self.functionhub_config)
-        )
+        self.functionhub_runner = FunctionHubRunner(self.functionhub_config)
         logger.info(f'FunctionHub config in process_request: {self.functionhub_config}')
 
     async def _init_browser_async(self):

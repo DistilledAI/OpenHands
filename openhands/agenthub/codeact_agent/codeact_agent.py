@@ -147,6 +147,28 @@ class CodeActAgent(Agent):
         # Combine base tools with the dynamically found tools
         combined_tools = self.tools + function_hub_tools
 
+        # Handle the case where tools have the same name
+        # Find duplicate tool names
+        tool_names = [tool['function']['name'] for tool in combined_tools]
+        duplicates = [name for name in tool_names if tool_names.count(name) > 1]
+
+        if duplicates:
+            logger.warning(f'Duplicate tool names found: {duplicates}')
+            combined_tools_unique = []
+            combined_tools_unique_names = []
+            for tool in combined_tools:
+                if tool['function']['name'] not in combined_tools_unique_names:
+                    combined_tools_unique.append(tool)
+                    combined_tools_unique_names.append(tool['function']['name'])
+                else:
+                    logger.warning(
+                        f"Duplicate tool name: {tool['function']['name']}, using the first one"
+                    )
+            combined_tools = combined_tools_unique
+            logger.info(
+                f'Combined tools after removing duplicates: {combined_tools_unique_names}'
+            )
+
         params: dict = {
             'messages': self.llm.format_messages_for_llm(messages),
             'tools': combined_tools,  # Use combined tools instead of just self.tools

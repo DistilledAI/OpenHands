@@ -65,16 +65,17 @@ class MarkTaskAction(Action):
     plan_id: str
     task_index: int
     task_status: str
+    task_content: str = ''
     task_result: str = ''
     action: str = ActionType.MASK_TASK
 
     @property
     def message(self) -> str:
-        return f'Masked task {self.task_index} in plan {self.plan_id} with status {self.task_status} and result {self.task_result}'
+        return self.task_content
 
 
 @dataclass
-class AsignTaskAction(Action):
+class AssignTaskAction(Action):
     """An action where the agent assigns a task to a delegate.
 
     Attributes:

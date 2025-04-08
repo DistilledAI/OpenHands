@@ -1,15 +1,16 @@
+import { setCurrentTask } from "#/state/agent-slice";
 import {
-  addAssistantMessage,
   addAssistantAction,
-  addUserMessage,
+  addAssistantMessage,
   addErrorMessage,
+  addUserMessage,
 } from "#/state/chat-slice";
-import { trackError } from "#/utils/error-handler";
-import { appendSecurityAnalyzerInput } from "#/state/security-analyzer-slice";
-import { setCode, setActiveFilepath } from "#/state/code-slice";
+import { setActiveFilepath, setCode } from "#/state/code-slice";
+import { appendInput } from "#/state/command-slice";
 import { appendJupyterInput } from "#/state/jupyter-slice";
-import { setCurStatusMessage } from "#/state/status-slice";
 import { setMetrics } from "#/state/metrics-slice";
+import { appendSecurityAnalyzerInput } from "#/state/security-analyzer-slice";
+import { setCurStatusMessage } from "#/state/status-slice";
 import store from "#/store";
 import ActionType from "#/types/action-type";
 import {
@@ -17,8 +18,8 @@ import {
   ObservationMessage,
   StatusMessage,
 } from "#/types/message";
+import { trackError } from "#/utils/error-handler";
 import { handleObservationMessage } from "./observations";
-import { appendInput } from "#/state/command-slice";
 
 const messageActions = {
   [ActionType.BROWSE]: (message: ActionMessage) => {
@@ -40,6 +41,9 @@ const messageActions = {
     const { path, content } = message.args;
     store.dispatch(setActiveFilepath(path));
     store.dispatch(setCode(content));
+  },
+  [ActionType.CREATE_PLAN]: (message: ActionMessage) => {
+    store.dispatch(addAssistantMessage(message?.message));
   },
   [ActionType.MESSAGE]: (message: ActionMessage) => {
     if (message.source === "user") {
@@ -87,7 +91,11 @@ const messageActions = {
 };
 
 export function handleActionMessage(message: ActionMessage) {
-  if (message.args?.hidden) {
+  if (
+    message.args?.hidden ||
+    (typeof message.args?.displayable === "boolean" &&
+      message.args?.displayable === false)
+  ) {
     return;
   }
 
@@ -107,6 +115,11 @@ export function handleActionMessage(message: ActionMessage) {
     store.dispatch(appendInput(message.args.command));
   }
 
+  // Mask task
+  if (message.action === ActionType.MASK_TASK) {
+    store.dispatch(setCurrentTask(message));
+  }
+
   if ("args" in message && "security_risk" in message.args) {
     store.dispatch(appendSecurityAnalyzerInput(message));
   }
@@ -121,6 +134,7 @@ export function handleActionMessage(message: ActionMessage) {
   }
 
   if (message.action in messageActions) {
+    console.log("1111111-2222222222🚀 ~ action message:", message.action);
     const actionFn =
       messageActions[message.action as keyof typeof messageActions];
     actionFn(message);

@@ -50,7 +50,7 @@ from openhands.events.action import (
     ActionConfirmationStatus,
     AgentFinishAction,
     AgentRejectAction,
-    AsignTaskAction,
+    AssignTaskAction,
     ChangeAgentStateAction,
     CmdRunAction,
     CreatePlanAction,
@@ -100,7 +100,11 @@ class PlanController:
         MarkTaskAction,
     )
     # pass type of events that should be passed to the agent when delegate agents are resolving tasks
-    pass_type: ClassVar[tuple[type[Event], ...]] = (AgentFinishAction, AsignTaskAction)
+    pass_type: ClassVar[tuple[type[Event], ...]] = (
+        AgentFinishAction,
+        CreatePlanAction,
+        AssignTaskAction,
+    )
     _cached_first_user_message: MessageAction | None = None
 
     # task_controllers
@@ -341,6 +345,7 @@ class PlanController:
             action = self._replay_manager.step()
         else:
             try:
+                logger.warning('Panner is stepping')
                 action = self.planning_agent.step(self.state)
                 if action is None:
                     raise LLMNoActionError('No action was returned')
@@ -415,6 +420,8 @@ class PlanController:
         # it might be the delegate's day in the sun
         # if self.delegate is not None:
         #     return False
+        if self._is_awaiting_for_task_resolving():
+            return False
 
         if isinstance(event, Action):
             if isinstance(event, CreatePlanAction) or isinstance(event, MarkTaskAction):
@@ -465,14 +472,12 @@ class PlanController:
         # Give others a little chance
         await asyncio.sleep(0.01)
 
-        # if the event is not filtered out and tasks are not resolved by delegate agent, add it to the history
+        # if the event is not filtered out, add it to the history based on conditions
         if not any(isinstance(event, filter_type) for filter_type in self.filter_out):
-            if not self._is_awaiting_for_task_resolving():
+            if (not self._is_awaiting_for_task_resolving()) or (
+                any(isinstance(event, pass_type) for pass_type in self.pass_type)
+            ):
                 self.state.history.append(event)
-            elif any(isinstance(event, pass_type) for pass_type in self.pass_type):
-                self.state.history.append(event)
-            else:
-                pass
 
         if isinstance(event, Action):
             await self._handle_action(event)
@@ -492,9 +497,9 @@ class PlanController:
             if action.task_status == TaskStatus.IN_PROGRESS:
                 self.state.current_task_index = action.task_index
                 plan: Plan = self.state.plans[self.state.active_plan_id]
-                # asign the task to the agent
+                # assign the task to the agent
                 self.event_stream.add_event(
-                    AsignTaskAction(
+                    AssignTaskAction(
                         plan_id=self.state.active_plan_id,
                         task_index=action.task_index,
                         task_content=plan.tasks[action.task_index].content,
@@ -502,8 +507,8 @@ class PlanController:
                     ),
                     EventSource.USER,
                 )
-        elif isinstance(action, AsignTaskAction):
-            await self._asign_task_to_the_delegate(action)
+        elif isinstance(action, AssignTaskAction):
+            await self._assign_task_to_the_delegate(action)
 
         elif isinstance(action, AgentFinishAction):
             # AgentFinishAction from current planning agent
@@ -515,13 +520,13 @@ class PlanController:
             else:
                 # mark the task as completed
                 active_plan_obj: Plan = self.state.plans[self.state.active_plan_id]
-                active_plan_obj.tasks[
-                    self.state.current_task_index
-                ].status = TaskStatus.COMPLETED
+                current_task = active_plan_obj.tasks[self.state.current_task_index]
+                current_task.status = TaskStatus.COMPLETED
                 self.event_stream.add_event(
                     MarkTaskAction(
                         plan_id=self.state.active_plan_id,
                         task_index=self.state.current_task_index,
+                        task_content=current_task.content,
                         task_status=TaskStatus.COMPLETED,
                     ),
                     EventSource.AGENT,
@@ -530,27 +535,41 @@ class PlanController:
                 # update result to the active plan
                 active_plan_obj.tasks[
                     self.state.current_task_index
-                ].result = action.message
+                ].result = action.final_thought
 
                 # delete the controller corresponding to the task
                 if self.state.active_plan_id in self.task_controllers:
+                    await self.task_controllers[self.state.active_plan_id][
+                        self.state.current_task_index
+                    ].close(set_stop_state=False)
+
                     del self.task_controllers[self.state.active_plan_id][
                         self.state.current_task_index
                     ]
 
-                # move to the next task
-                self.state.current_task_index += 1
-                active_plan_obj.tasks[
-                    self.state.current_task_index
-                ].status = TaskStatus.IN_PROGRESS
-                self.event_stream.add_event(
-                    MarkTaskAction(
-                        plan_id=self.state.active_plan_id,
-                        task_index=self.state.current_task_index,
-                        task_status=TaskStatus.IN_PROGRESS,
-                    ),
-                    EventSource.AGENT,
-                )
+                # move to the next task if plan is not finished
+                if self.state.current_task_index + 1 < len(active_plan_obj.tasks):
+                    self.state.current_task_index += 1
+                    current_task = active_plan_obj.tasks[self.state.current_task_index]
+                    current_task.status = TaskStatus.IN_PROGRESS
+                    self.event_stream.add_event(
+                        MarkTaskAction(
+                            plan_id=self.state.active_plan_id,
+                            task_index=self.state.current_task_index,
+                            task_content=current_task.content,
+                            task_status=TaskStatus.IN_PROGRESS,
+                        ),
+                        EventSource.AGENT,
+                    )
+                # if plan is finished, add user message to trigger planner finalize the plan
+                else:
+                    self.event_stream.add_event(
+                        MessageAction(
+                            content='All tasks are completed. Please accomplish the plan and send it to the user.',
+                            displayable=False,
+                        ),
+                        EventSource.USER,
+                    )
 
         elif isinstance(action, AgentRejectAction):
             self.state.outputs = action.outputs
@@ -573,6 +592,7 @@ class PlanController:
                 MarkTaskAction(
                     plan_id=self.state.active_plan_id,
                     task_index=self.state.current_task_index,
+                    task_content=active_plan.tasks[0].content,
                     task_status=TaskStatus.IN_PROGRESS,
                 ),
                 EventSource.AGENT,
@@ -1179,16 +1199,30 @@ class PlanController:
             content=active_plan._format_plan(w_result=w_result),
         )
 
-    async def _asign_task_to_the_delegate(self, action: AsignTaskAction) -> None:
-        """Asign a task to the delegate.
+    async def _assign_task_to_the_delegate(self, action: AssignTaskAction) -> None:
+        """Assign a task to the delegate.
 
         Args:
-            action: The AsignTaskAction to process.
+            action: The AssignTaskAction to process.
         """
 
         # init the task controllers if not already done
         if action.plan_id not in self.task_controllers:
             self.task_controllers[action.plan_id] = {}
+
+        # init state
+        state = State(
+            session_id=action.delegate_id,
+            inputs={},
+            local_iteration=0,
+            iteration=self.state.iteration,
+            max_iterations=self.state.max_iterations,
+            delegate_level=self.state.delegate_level + 1,
+            # global metrics should be shared between parent and child
+            metrics=self.state.metrics,
+            # start on top of the stream
+            start_id=self.event_stream.get_latest_event_id() + 1,
+        )
 
         # init controller for the task
         controller = AgentController(
@@ -1202,32 +1236,34 @@ class PlanController:
             confirmation_mode=self.state.confirmation_mode,
             headless_mode=False,
             status_callback=self.status_callback,
-            initial_state=None,
+            initial_state=state,
             replay_events=None,
         )
 
         self.task_controllers[action.plan_id][action.task_index] = controller
 
-        # asign the task to the agent controller
-        asign_plan: Plan = self.state.plans[action.plan_id]
+        # assign the task to the agent controller
+        assign_plan: Plan = self.state.plans[action.plan_id]
 
-        asign_task_prompt = f"""
+        assign_task_prompt = f"""
         CURRENT PLAN STATUS:
-        {asign_plan._format_plan(w_result=True)}
+        {assign_plan._format_plan(w_result=True)}
 
         YOUR CURRENT TASK:
-        You are now working on task {action.task_index}: "{asign_plan.tasks[action.task_index].content}".
+        You are now working on task {action.task_index}: "{assign_plan.tasks[action.task_index].content}".
+        Please make it done as less steps as possible. You only need to focus on this task and ignore the rest of the plan.
         Know that current time is {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}.
-        """
+        """.strip()
 
         self.event_stream.add_event(
-            MessageAction(
-                content=asign_task_prompt,
-            ),
+            MessageAction(content=assign_task_prompt, displayable=False),
             EventSource.USER,
         )
 
     def _is_awaiting_for_task_resolving(self) -> bool:
+        if self.state.plans:
+            return not self._is_all_task_resolved()
+
         for plan_id, task_controllers in self.task_controllers.items():
             for task_index, controller in task_controllers.items():
                 if controller.get_agent_state() == AgentState.RUNNING:
@@ -1235,11 +1271,16 @@ class PlanController:
         return False
 
     def _is_all_task_resolved(self) -> bool:
-        if not self.task_controllers:
-            return False
+        # if not self.task_controllers:
+        #     return False
 
-        for plan_id, task_controllers in self.task_controllers.items():
-            for task_index, controller in task_controllers.items():
-                if controller.get_agent_state() != AgentState.FINISHED:
-                    return False
+        active_plan: Plan = self.state.plans[self.state.active_plan_id]
+
+        for task in active_plan.tasks:
+            if (
+                task.status != TaskStatus.COMPLETED
+                and task.status != TaskStatus.BLOCKED
+            ):
+                return False
+
         return True

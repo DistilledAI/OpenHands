@@ -13,9 +13,13 @@ from litellm import (
 from openhands.agenthub.planner_agent.tools import (
     BrowserTool,
     FinishTool,
+    IPythonTool,
+    LLMBasedFileEditTool,
     PlanningTool,
     ThinkTool,
     WebReadTool,
+    create_cmd_run_tool,
+    create_str_replace_editor_tool,
 )
 from openhands.core.exceptions import (
     FunctionCallValidationError,
@@ -27,11 +31,17 @@ from openhands.events.action import (
     AgentThinkAction,
     BrowseInteractiveAction,
     BrowseURLAction,
+    CmdRunAction,
     CreatePlanAction,
+    FileEditAction,
+    FileReadAction,
+    IPythonRunCellAction,
     McpAction,
     MessageAction,
 )
+from openhands.events.event import FileEditSource, FileReadSource
 from openhands.events.tool import ToolCallMetadata
+from openhands.llm import LLM
 
 
 def combine_thought(action: Action, thought: str) -> Action:
@@ -62,7 +72,7 @@ def response_to_actions(response: ModelResponse) -> list[Action]:
         # Process each tool call to OpenHands action
         for i, tool_call in enumerate(assistant_msg.tool_calls):
             action: Action
-            logger.warning(f'Tool call in function_calling.py: {tool_call}')
+
             try:
                 arguments = json.loads(tool_call.function.arguments)
             except json.decoder.JSONDecodeError as e:
@@ -70,21 +80,33 @@ def response_to_actions(response: ModelResponse) -> list[Action]:
                     f'Failed to parse tool call arguments: {tool_call.function.arguments}'
                 ) from e
 
-            # if tool_call.function.name == 'delegate_to_browsing_agent':
-            #     action = AgentDelegateAction(
-            #         agent='BrowsingAgent',
-            #         inputs=arguments,
-            #     )
+            # logs all tool names
+            logger.warning(
+                f'==== PLANNER AGENT : Tool name in function_calling.py: {tool_call.function.name} ========================='
+            )
 
             # ================================================
-            # CreatePlanAction
+            # CmdRunTool (Bash)
             # ================================================
-            if tool_call.function.name == PlanningTool['function']['name']:
-                action = CreatePlanAction(
-                    plan_id=arguments.get('plan_id', ''),
-                    title=arguments.get('title', ''),
-                    tasks=arguments.get('tasks', []),
-                )
+
+            if tool_call.function.name == create_cmd_run_tool()['function']['name']:
+                if 'command' not in arguments:
+                    raise FunctionCallValidationError(
+                        f'Missing required argument "command" in tool call {tool_call.function.name}'
+                    )
+                # convert is_input to boolean
+                is_input = arguments.get('is_input', 'false') == 'true'
+                action = CmdRunAction(command=arguments['command'], is_input=is_input)
+
+            # ================================================
+            # IPythonTool (Jupyter)
+            # ================================================
+            elif tool_call.function.name == IPythonTool['function']['name']:
+                if 'code' not in arguments:
+                    raise FunctionCallValidationError(
+                        f'Missing required argument "code" in tool call {tool_call.function.name}'
+                    )
+                action = IPythonRunCellAction(code=arguments['code'])
 
             # ================================================
             # AgentFinishAction
@@ -95,6 +117,58 @@ def response_to_actions(response: ModelResponse) -> list[Action]:
                     task_completed=arguments.get('task_completed', None),
                 )
 
+            # ================================================
+            # LLMBasedFileEditTool (LLM-based file editor, deprecated)
+            # ================================================
+            elif tool_call.function.name == LLMBasedFileEditTool['function']['name']:
+                if 'path' not in arguments:
+                    raise FunctionCallValidationError(
+                        f'Missing required argument "path" in tool call {tool_call.function.name}'
+                    )
+                if 'content' not in arguments:
+                    raise FunctionCallValidationError(
+                        f'Missing required argument "content" in tool call {tool_call.function.name}'
+                    )
+                action = FileEditAction(
+                    path=arguments['path'],
+                    content=arguments['content'],
+                    start=arguments.get('start', 1),
+                    end=arguments.get('end', -1),
+                )
+            elif (
+                tool_call.function.name
+                == create_str_replace_editor_tool()['function']['name']
+            ):
+                if 'command' not in arguments:
+                    raise FunctionCallValidationError(
+                        f'Missing required argument "command" in tool call {tool_call.function.name}'
+                    )
+                if 'path' not in arguments:
+                    raise FunctionCallValidationError(
+                        f'Missing required argument "path" in tool call {tool_call.function.name}'
+                    )
+                path = arguments['path']
+                command = arguments['command']
+                other_kwargs = {
+                    k: v for k, v in arguments.items() if k not in ['command', 'path']
+                }
+
+                if command == 'view':
+                    action = FileReadAction(
+                        path=path,
+                        impl_source=FileReadSource.OH_ACI,
+                        view_range=other_kwargs.get('view_range', None),
+                    )
+                else:
+                    if 'view_range' in other_kwargs:
+                        # Remove view_range from other_kwargs since it is not needed for FileEditAction
+                        other_kwargs.pop('view_range')
+                    action = FileEditAction(
+                        path=path,
+                        command=command,
+                        impl_source=FileEditSource.OH_ACI,
+                        **other_kwargs,
+                    )
             # ================================================
             # AgentThinkAction
             # ================================================
@@ -120,6 +194,16 @@ def response_to_actions(response: ModelResponse) -> list[Action]:
                         f'Missing required argument "url" in tool call {tool_call.function.name}'
                     )
                 action = BrowseURLAction(url=arguments['url'])
+
+            # ================================================
+            # CreatePlanAction
+            # ================================================
+            elif tool_call.function.name == PlanningTool['function']['name']:
+                action = CreatePlanAction(
+                    plan_id=arguments.get('plan_id', ''),
+                    title=arguments.get('title', ''),
+                    tasks=arguments.get('tasks', []),
+                )
 
             # ================================================
             # Other cases -> McpTool (MCP)
@@ -158,9 +242,38 @@ def response_to_actions(response: ModelResponse) -> list[Action]:
     return actions
 
 
-def get_tools() -> list[ChatCompletionToolParam]:
-    """
-    Get the list of tools that are available for function calling.
-    """
+def get_tools(
+    codeact_enable_browsing: bool = False,
+    codeact_enable_llm_editor: bool = False,
+    codeact_enable_jupyter: bool = False,
+    llm: LLM | None = None,
+) -> list[ChatCompletionToolParam]:
+    SIMPLIFIED_TOOL_DESCRIPTION_LLM_SUBSTRS = ['gpt-', 'o3', 'o1']
 
-    return [WebReadTool, BrowserTool, ThinkTool, PlanningTool, FinishTool]
+    use_simplified_tool_desc = False
+    if llm is not None:
+        use_simplified_tool_desc = any(
+            model_substr in llm.config.model
+            for model_substr in SIMPLIFIED_TOOL_DESCRIPTION_LLM_SUBSTRS
+        )
+
+    tools = [
+        PlanningTool,
+        create_cmd_run_tool(use_simplified_description=use_simplified_tool_desc),
+        ThinkTool,
+        FinishTool,
+    ]
+    # if codeact_enable_browsing:
+    #     tools.append(WebReadTool)
+    #     tools.append(BrowserTool)
+    if codeact_enable_jupyter:
+        tools.append(IPythonTool)
+    if codeact_enable_llm_editor:
+        tools.append(LLMBasedFileEditTool)
+    else:
+        tools.append(
+            create_str_replace_editor_tool(
+                use_simplified_description=use_simplified_tool_desc
+            )
+        )
+    return tools

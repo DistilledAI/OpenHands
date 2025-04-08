@@ -1,19 +1,19 @@
-import React from "react";
-import { useTranslation } from "react-i18next";
-import { useSelector } from "react-redux";
-import { showErrorToast } from "#/utils/error-handler";
-import { RootState } from "#/store";
-import { AgentState } from "#/types/agent-state";
-import {
-  AGENT_STATUS_MAP,
-  IndicatorColor,
-} from "../../agent-status-map.constant";
 import {
   useWsClient,
   WsClientProviderStatus,
 } from "#/context/ws-client-provider";
 import { useNotification } from "#/hooks/useNotification";
+import { RootState } from "#/store";
+import { AgentState } from "#/types/agent-state";
 import { browserTab } from "#/utils/browser-tab";
+import { showErrorToast } from "#/utils/error-handler";
+import React from "react";
+import { useTranslation } from "react-i18next";
+import { useSelector } from "react-redux";
+import {
+  AGENT_STATUS_MAP,
+  IndicatorColor,
+} from "../../agent-status-map.constant";
 
 const notificationStates = [
   AgentState.AWAITING_USER_INPUT,
@@ -23,11 +23,15 @@ const notificationStates = [
 
 export function AgentStatusBar() {
   const { t, i18n } = useTranslation();
-  const { curAgentState } = useSelector((state: RootState) => state.agent);
+  const { curAgentState, currentTask } = useSelector(
+    (state: RootState) => state.agent,
+  );
+  console.log("🚀 ~ AgentStatusBar ~ currentTask:", currentTask);
   const { curStatusMessage } = useSelector((state: RootState) => state.status);
   const { status } = useWsClient();
   const { notify } = useNotification();
 
+  const taskContent = currentTask?.args?.task_content;
   const [statusMessage, setStatusMessage] = React.useState<string>("");
 
   const updateStatusMessage = () => {
@@ -100,11 +104,14 @@ export function AgentStatusBar() {
 
   return (
     <div className="flex flex-col items-center">
-      <div className="flex items-center bg-base-secondary px-2 py-1 text-gray-400 rounded-[100px] text-sm gap-[6px]">
+      <div className="flex items-center px-2 py-1 text-gray-400 rounded-[100px] text-sm gap-[6px]">
         <div
           className={`w-2 h-2 rounded-full animate-pulse ${indicatorColor}`}
         />
-        <span className="text-sm text-stone-400">{t(statusMessage)}</span>
+        <span className="text-sm text-stone-400">
+          {t(statusMessage)}
+          {curAgentState === AgentState.RUNNING ? taskContent : ""}
+        </span>
       </div>
     </div>
   );

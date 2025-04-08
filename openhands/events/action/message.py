@@ -11,6 +11,7 @@ class MessageAction(Action):
     wait_for_response: bool = False
     action: str = ActionType.MESSAGE
     security_risk: ActionSecurityRisk | None = None
+    displayable: bool = True
 
     @property
     def message(self) -> str:

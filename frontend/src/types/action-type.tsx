@@ -5,6 +5,9 @@ enum ActionType {
   // Represents a message from the user or agent.
   MESSAGE = "message",
 
+  // Creates a plan for the agent.
+  CREATE_PLAN = "create_plan",
+
   // Reads the contents of a file.
   READ = "read",
 
@@ -41,6 +44,9 @@ enum ActionType {
 
   // Take a screenshot of the browser
   PLAYWRIGHT_MCP_BROWSER_SCREENSHOT = "playwright_mcp_browser_screenshot",
+
+  // Take a screenshot of the browser
+  MASK_TASK = "mask_task",
 }
 
 export default ActionType;

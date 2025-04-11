@@ -32,12 +32,16 @@ class Agent(ABC):
         self,
         llm: LLM,
         config: 'AgentConfig',
+        workspace_mount_path_in_sandbox_store_in_session: bool = True,
     ):
         self.llm = llm
         self.config = config
         self._complete = False
         self.prompt_manager: 'PromptManager' | None = None
         self.mcp_tools: list[dict] = []
+        self.workspace_mount_path_in_sandbox_store_in_session = (
+            workspace_mount_path_in_sandbox_store_in_session
+        )
 
     @property
     def complete(self) -> bool:

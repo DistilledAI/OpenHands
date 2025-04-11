@@ -7,7 +7,7 @@ Use this tool when:
 - You maynot proceed further due to technical limitations or missing information
 
 The message should concise and include:
-- The path to the file where the final answer is saved
+- The absolute path to the file where the final answer is saved. Eg: `/workspace/36eedc34afb34d84ba1a1bfdb13e0e97/result.md or /workspace/result.md`. If there's a session id, it should be included in the path, e.g. `/workspace/36eedc34afb34d84ba1a1bfdb13e0e97/result.md`."
 
 The task_completed field should be set to True if you believe you have successfully completed the task, and False otherwise.
 """
@@ -23,7 +23,7 @@ FinishTool = ChatCompletionToolParam(
             'properties': {
                 'message': {
                     'type': 'string',
-                    'description': 'The final message to the user, including the path to the file where the final answer is saved',
+                    'description': 'The final message to the user, including the absolute path to the file where the final answer is saved.',
                 },
                 'task_completed': {
                     'type': 'boolean',

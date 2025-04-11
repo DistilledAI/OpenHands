@@ -1,6 +1,7 @@
 import os
 from collections import deque
 from datetime import datetime
+import json
 
 import openhands.agenthub.planning_agent.function_calling as planning_function_calling
 from openhands.controller.agent import Agent
@@ -44,14 +45,16 @@ class PlanningAgent(Agent):
         self,
         llm: LLM,
         config: AgentConfig,
+        workspace_mount_path_in_sandbox_store_in_session: bool = True,
     ) -> None:
         """Initializes a new instance of the PlanningAgent class.
 
         Parameters:
         - llm (LLM): The llm to be used by this agent
         - config (AgentConfig): The configuration for this agent
+        - workspace_mount_path_in_sandbox_store_in_session (bool): Whether to mount the workspace path in the sandbox store in the session
         """
-        super().__init__(llm, config)
+        super().__init__(llm, config, workspace_mount_path_in_sandbox_store_in_session)
         self.pending_actions: deque[Action] = deque()
         self.reset()
 
@@ -135,19 +138,27 @@ class PlanningAgent(Agent):
             ]
             params['tools'] += unique_mcp_tools
 
-        import json
+        # debugging
         logger.debug(
             f'Available tool names inner PlanningAgent: {", ".join([tool["function"]["name"] for tool in params["tools"]])}'
-        )
-        logger.debug(
-            f'LLM messages inner PlanningAgent:\n{json.dumps(self.llm.format_messages_for_llm(messages), indent=2)}'
         )
 
         # log to litellm proxy if possible
         params['extra_body'] = {'metadata': state.to_llm_metadata(agent_name=self.name)}
-        response = self.llm.completion(**params)
+        try:
+            response = self.llm.completion(**params)
+        except Exception as e:
+            logger.warning(
+                f'Error in Planning Agent LLM completion with messages:\n{json.dumps(params["messages"], indent=2)}'
+            )
+            raise e
+
         logger.debug(f'Response from LLM: {response}')
-        actions = planning_function_calling.response_to_actions(response)
+        actions = planning_function_calling.response_to_actions(
+            response,
+            state.session_id,
+            self.workspace_mount_path_in_sandbox_store_in_session,
+        )
         logger.debug(f'Actions after response_to_actions: {actions}')
         for action in actions:
             self.pending_actions.append(action)

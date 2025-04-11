@@ -11,6 +11,12 @@ enum ObservationType {
   // Interactive browsing
   BROWSE_INTERACTIVE = "browse_interactive",
 
+  // The screenshot of a Playwright MCP Browser
+  BROWSER_MCP = "browser_mcp",
+
+  // The result of a MCP Server operation
+  MCP = "mcp",
+
   // The output of a command
   RUN = "run",
 
@@ -34,6 +40,9 @@ enum ObservationType {
 
   // A no-op observation
   NULL = "null",
+
+  // error message
+  ERROR = "error",
 }
 
-export default ObservationType;
+export default ObservationType

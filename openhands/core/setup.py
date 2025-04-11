@@ -179,6 +179,7 @@ def create_agent(config: AppConfig) -> Agent:
     agent = agent_cls(
         llm=LLM(config=llm_config),
         config=agent_config,
+        workspace_mount_path_in_sandbox_store_in_session=config.workspace_mount_path_in_sandbox_store_in_session,
     )
 
     return agent

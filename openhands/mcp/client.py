@@ -10,34 +10,49 @@ from openhands.mcp.tool import BaseTool, MCPClientTool
 
 
 class MCPClient(BaseModel):
-    """
-    A collection of tools that connects to an MCP server and manages available tools through the Model Context Protocol.
-    """
+    """A collection of tools that connects to an MCP server and manages available tools through the Model Context Protocol."""
 
     session: Optional[ClientSession] = None
     exit_stack: AsyncExitStack = AsyncExitStack()
     description: str = 'MCP client tools for server interaction'
     tools: List[BaseTool] = Field(default_factory=list)
     tool_map: Dict[str, BaseTool] = Field(default_factory=dict)
+    name: str = Field(default='')
 
     class Config:
         arbitrary_types_allowed = True
 
-    async def connect_sse(self, server_url: str, timeout: float = 30.0) -> None:
+    async def connect_sse(
+        self,
+        server_url: str,
+        sid: Optional[str] = None,
+        mnemonic: Optional[str] = None,
+        timeout: float = 5.0,
+    ) -> None:
         """Connect to an MCP server using SSE transport.
 
         Args:
             server_url: The URL of the SSE server to connect to.
             timeout: Connection timeout in seconds. Default is 30 seconds.
+            sid: The session id.
+            mnemonic: The mnemonic for the session.
         """
         if not server_url:
             raise ValueError('Server URL is required.')
         if self.session:
             await self.disconnect()
 
+        headers = {
+            k: v for k, v in {'sid': sid, 'mnemonic': mnemonic}.items() if v is not None
+        }
+        logger.info(f'sid: {sid}')
+        logger.info('Connecting to MCP server')
+
         try:
             streams_context = sse_client(
                 url=server_url,
+                headers=headers,
+                timeout=timeout,
             )
             streams = await self.exit_stack.enter_async_context(streams_context)
             self.session = await self.exit_stack.enter_async_context(

@@ -133,6 +133,17 @@ export interface RejectAction extends OpenHandsActionEvent<"reject"> {
   };
 }
 
+export interface MCPAction extends OpenHandsActionEvent<"call_tool_mcp"> {
+  source: "agent";
+  args: {
+    name: string;
+    arguments: string;
+    thought: string;
+    sid: string;
+    security_risk: ActionSecurityRisk | null;
+  };
+  message: string;
+}
 export interface RecallAction extends OpenHandsActionEvent<"recall"> {
   source: "agent";
   args: {
@@ -156,4 +167,5 @@ export type OpenHandsAction =
   | FileEditAction
   | FileWriteAction
   | RejectAction
+  | MCPAction
   | RecallAction;

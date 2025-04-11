@@ -8,10 +8,25 @@ import {
   Conversation,
   ResultSet,
   GetTrajectoryResponse,
-} from "./open-hands.types";
-import { openHands } from "./open-hands-axios";
-import { ApiSettings, PostApiSettings } from "#/types/settings";
-import { GitUser, GitRepository } from "#/types/git";
+  GetUseCasesItemResponse,
+} from "./open-hands.types"
+import { openHands } from "./open-hands-axios"
+import { ApiSettings, PostApiSettings } from "#/types/settings"
+import { displayErrorToast } from "#/utils/custom-toast-handlers"
+
+interface VerifySignatureResponse {
+  user: {
+    id: string
+    publicAddress: string
+  }
+  token: string
+}
+
+interface VerifySignatureRequest {
+  signature: string
+  message: string
+}
+import { GitUser, GitRepository } from "#/types/git"
 
 class OpenHands {
   /**
@@ -19,8 +34,8 @@ class OpenHands {
    * @returns List of models available
    */
   static async getModels(): Promise<string[]> {
-    const { data } = await openHands.get<string[]>("/api/options/models");
-    return data;
+    const { data } = await openHands.get<string[]>("/api/options/models")
+    return data
   }
 
   /**
@@ -28,8 +43,10 @@ class OpenHands {
    * @returns List of agents available
    */
   static async getAgents(): Promise<string[]> {
-    const { data } = await openHands.get<string[]>("/api/options/agents");
-    return data;
+    const { data } = await openHands.get<string[]>("/api/options/agents")
+    const BLACK_LIST = ["BrowsingAgent", "DummyAgent", "VisualBrowsingAgent"]
+
+    return (data || []).filter((x) => !BLACK_LIST.includes(x))
   }
 
   /**
@@ -39,15 +56,22 @@ class OpenHands {
   static async getSecurityAnalyzers(): Promise<string[]> {
     const { data } = await openHands.get<string[]>(
       "/api/options/security-analyzers",
-    );
-    return data;
+    )
+    return data
   }
 
   static async getConfig(): Promise<GetConfigResponse> {
     const { data } = await openHands.get<GetConfigResponse>(
       "/api/options/config",
-    );
-    return data;
+    )
+    return data
+  }
+
+  static async getUseCases(): Promise<GetUseCasesItemResponse> {
+    const { data } = await openHands.get<GetUseCasesItemResponse>(
+      "/api/options/use-cases",
+    )
+    return data
   }
 
   /**
@@ -59,9 +83,9 @@ class OpenHands {
     conversationId: string,
     feedback: Feedback,
   ): Promise<FeedbackResponse> {
-    const url = `/api/conversations/${conversationId}/submit-feedback`;
-    const { data } = await openHands.post<FeedbackResponse>(url, feedback);
-    return data;
+    const url = `/api/conversations/${conversationId}/submit-feedback`
+    const { data } = await openHands.post<FeedbackResponse>(url, feedback)
+    return data
   }
 
   /**
@@ -71,11 +95,11 @@ class OpenHands {
   static async authenticate(
     appMode: GetConfigResponse["APP_MODE"],
   ): Promise<boolean> {
-    if (appMode === "oss") return true;
+    if (appMode === "oss") return true
 
     const response =
-      await openHands.post<AuthenticateResponse>("/api/authenticate");
-    return response.status === 200;
+      await openHands.post<AuthenticateResponse>("/api/authenticate")
+    return response.status === 200
   }
 
   /**
@@ -83,11 +107,11 @@ class OpenHands {
    * @returns Blob of the workspace zip
    */
   static async getWorkspaceZip(conversationId: string): Promise<Blob> {
-    const url = `/api/conversations/${conversationId}/zip-directory`;
+    const url = `/api/conversations/${conversationId}/zip-directory`
     const response = await openHands.get(url, {
       responseType: "blob",
-    });
-    return response.data;
+    })
+    return response.data
   }
 
   /**
@@ -102,8 +126,8 @@ class OpenHands {
       {
         code,
       },
-    );
-    return data;
+    )
+    return data
   }
 
   /**
@@ -115,8 +139,8 @@ class OpenHands {
   ): Promise<GetVSCodeUrlResponse> {
     const { data } = await openHands.get<GetVSCodeUrlResponse>(
       `/api/conversations/${conversationId}/vscode-url`,
-    );
-    return data;
+    )
+    return data
   }
 
   static async getRuntimeId(
@@ -124,26 +148,26 @@ class OpenHands {
   ): Promise<{ runtime_id: string }> {
     const { data } = await openHands.get<{ runtime_id: string }>(
       `/api/conversations/${conversationId}/config`,
-    );
-    return data;
+    )
+    return data
   }
 
   static async getUserConversations(): Promise<Conversation[]> {
     const { data } = await openHands.get<ResultSet<Conversation>>(
       "/api/conversations?limit=9",
-    );
-    return data.results;
+    )
+    return data.results
   }
 
   static async deleteUserConversation(conversationId: string): Promise<void> {
-    await openHands.delete(`/api/conversations/${conversationId}`);
+    await openHands.delete(`/api/conversations/${conversationId}`)
   }
 
   static async updateUserConversation(
     conversationId: string,
     conversation: Partial<Omit<Conversation, "conversation_id">>,
   ): Promise<void> {
-    await openHands.patch(`/api/conversations/${conversationId}`, conversation);
+    await openHands.patch(`/api/conversations/${conversationId}`, conversation)
   }
 
   static async createConversation(
@@ -151,39 +175,50 @@ class OpenHands {
     initialUserMsg?: string,
     imageUrls?: string[],
     replayJson?: string,
-  ): Promise<Conversation> {
-    const body = {
-      selected_repository: selectedRepository,
-      selected_branch: undefined,
-      initial_user_msg: initialUserMsg,
-      image_urls: imageUrls,
-      replay_json: replayJson,
-    };
+  ): Promise<Conversation | undefined> {
+    try {
+      const body = {
+        selected_repository: selectedRepository,
+        selected_branch: undefined,
+        initial_user_msg: initialUserMsg,
+        image_urls: imageUrls,
+        replay_json: replayJson,
+      }
 
-    const { data } = await openHands.post<Conversation>(
-      "/api/conversations",
-      body,
-    );
+      const { data } = await openHands.post<Conversation>(
+        "/api/conversations",
+        body,
+      )
 
-    return data;
+      return data
+    } catch (error: any) {
+      displayErrorToast(
+        "response" in error
+          ? (error.response?.data?.detail ?? "Error create new conversation")
+          : "Error create new conversation",
+      )
+    }
   }
 
   static async getConversation(
     conversationId: string,
+    isPublic?: boolean | null,
   ): Promise<Conversation | null> {
-    const { data } = await openHands.get<Conversation | null>(
-      `/api/conversations/${conversationId}`,
-    );
+    console.log("isPublic", isPublic)
+    const path = isPublic
+      ? `/api/options/use-cases/conversations/${conversationId}`
+      : `/api/conversations/${conversationId}`
+    const { data } = await openHands.get<Conversation | null>(path)
 
-    return data;
+    return data
   }
 
   /**
    * Get the settings from the server or use the default settings if not found
    */
   static async getSettings(): Promise<ApiSettings> {
-    const { data } = await openHands.get<ApiSettings>("/api/settings");
-    return data;
+    const { data } = await openHands.get<ApiSettings>("/api/settings")
+    return data
   }
 
   /**
@@ -193,16 +228,16 @@ class OpenHands {
   static async saveSettings(
     settings: Partial<PostApiSettings>,
   ): Promise<boolean> {
-    const data = await openHands.post("/api/settings", settings);
-    return data.status === 200;
+    const data = await openHands.post("/api/settings", settings)
+    return data.status === 200
   }
 
   /**
    * Reset user settings in server
    */
   static async resetSettings(): Promise<boolean> {
-    const response = await openHands.post("/api/reset-settings");
-    return response.status === 200;
+    const response = await openHands.post("/api/reset-settings")
+    return response.status === 200
   }
 
   static async createCheckoutSession(amount: number): Promise<string> {
@@ -211,28 +246,28 @@ class OpenHands {
       {
         amount,
       },
-    );
-    return data.redirect_url;
+    )
+    return data.redirect_url
   }
 
   static async createBillingSessionResponse(): Promise<string> {
     const { data } = await openHands.post(
       "/api/billing/create-customer-setup-session",
-    );
-    return data.redirect_url;
+    )
+    return data.redirect_url
   }
 
   static async getBalance(): Promise<string> {
     const { data } = await openHands.get<{ credits: string }>(
       "/api/billing/credits",
-    );
-    return data.credits;
+    )
+    return data.credits
   }
 
   static async getGitUser(): Promise<GitUser> {
-    const response = await openHands.get<GitUser>("/api/user/info");
+    const response = await openHands.get<GitUser>("/api/user/info")
 
-    const { data } = response;
+    const { data } = response
 
     const user: GitUser = {
       id: data.id,
@@ -241,9 +276,9 @@ class OpenHands {
       company: data.company,
       name: data.name,
       email: data.email,
-    };
+    }
 
-    return user;
+    return user
   }
 
   static async searchGitRepositories(
@@ -258,9 +293,9 @@ class OpenHands {
           per_page,
         },
       },
-    );
+    )
 
-    return response.data;
+    return response.data
   }
 
   static async getTrajectory(
@@ -268,15 +303,52 @@ class OpenHands {
   ): Promise<GetTrajectoryResponse> {
     const { data } = await openHands.get<GetTrajectoryResponse>(
       `/api/conversations/${conversationId}/trajectory`,
-    );
-    return data;
+    )
+    return data
   }
 
   static async logout(appMode: GetConfigResponse["APP_MODE"]): Promise<void> {
     const endpoint =
-      appMode === "saas" ? "/api/logout" : "/api/unset-settings-tokens";
-    await openHands.post(endpoint);
+      appMode === "saas" ? "/api/logout" : "/api/unset-settings-tokens"
+    await openHands.post(endpoint)
+  }
+
+  /**
+   * Verify user's wallet signature and get JWT token
+   * @param signature The signature from MetaMask
+   * @param publicAddress The public address of the user's wallet
+   * @returns The user's public key and JWT token
+   */
+  static async verifySignature(
+    signature: string,
+    publicAddress: string,
+  ): Promise<VerifySignatureResponse> {
+    const { data } = await openHands.post<VerifySignatureResponse>(
+      "/api/auth/signup",
+      {
+        signature,
+        publicAddress,
+      },
+    )
+    return data
+  }
+
+  /**
+   * Get the address for the given network
+   * @param network The network to get the address for
+   * @returns The address for the given network
+   */
+  static async getAddressByNetwork(network: string | number): Promise<string> {
+    try {
+      const { data } = await openHands.get<string>(
+        `/api/auth/address-by-network/${network}`,
+      )
+      return data
+    } catch (error) {
+      console.error("getAddressByNetwork", error)
+      return ""
+    }
   }
 }
 
-export default OpenHands;
+export default OpenHands

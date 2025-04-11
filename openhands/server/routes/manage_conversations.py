@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Body, Request, status
+from fastapi import APIRouter, Body, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -37,6 +37,7 @@ from openhands.storage.data_models.conversation_metadata import ConversationMeta
 from openhands.storage.data_models.conversation_status import ConversationStatus
 from openhands.utils.async_utils import wait_all
 from openhands.utils.conversation_summary import generate_conversation_title
+from openhands.utils.get_user_setting import get_user_setting
 
 app = APIRouter(prefix='/api')
 
@@ -63,10 +64,22 @@ async def _create_new_conversation(
         'Creating conversation',
         extra={'signal': 'create_conversation', 'user_id': user_id},
     )
+
+    # Check if user already has any conversation
+    if user_id:
+        conversation_store = await ConversationStoreImpl.get_instance(
+            config, user_id, None
+        )
+        conversation_metadata_result_set = await conversation_store.search(limit=1)
+        if conversation_metadata_result_set.results:
+            existing_conversation = conversation_metadata_result_set.results[0]
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f'User already has a conversation (ID: {existing_conversation.conversation_id}).',
+            )
+
     logger.info('Loading settings')
-    settings_store = await SettingsStoreImpl.get_instance(config, user_id)
-    settings = await settings_store.load()
-    logger.info('Settings loaded')
+    settings = await get_user_setting(user_id)
 
     session_init_args: dict = {}
     if settings:

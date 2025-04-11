@@ -79,7 +79,7 @@ def test_get_messages(codeact_agent: CodeActAgent):
     )  # System, initial user + user message, agent message, last user message
     assert messages[0].content[0].cache_prompt  # system message
     assert messages[1].role == 'user'
-    assert messages[1].content[0].text.endswith('Initial user message')
+    assert messages[1].content[0].text.endswith('computer to solve tasks.')
     # we add cache breakpoint to only the last user message
     assert not messages[1].content[0].cache_prompt
 
@@ -119,5 +119,9 @@ def test_get_messages_prompt_caching(codeact_agent: CodeActAgent):
     )  # Including the initial system+user + last user message
 
     # Verify that these are indeed the last user message (from start)
-    assert cached_user_messages[0].content[0].text.startswith('You are OpenHands agent')
+    assert (
+        cached_user_messages[0]
+        .content[0]
+        .text.startswith('You are Thesis Capsule agent')
+    )
     assert cached_user_messages[1].content[0].text.startswith('User message 14')

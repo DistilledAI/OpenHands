@@ -1,7 +1,7 @@
 from unittest.mock import Mock
 
 import pytest
-from litellm import ChatCompletionMessageToolCall
+from litellm import ChatCompletionMessageToolCall, ModelResponse
 
 from openhands.agenthub.codeact_agent.codeact_agent import CodeActAgent
 from openhands.agenthub.codeact_agent.function_calling import (
@@ -214,15 +214,22 @@ def test_browser_tool():
 
 def test_response_to_actions_invalid_tool():
     # Test response with invalid tool call
-    mock_response = Mock()
-    mock_response.choices = [Mock()]
-    mock_response.choices[0].message = Mock()
-    mock_response.choices[0].message.content = 'Invalid tool'
-    mock_response.choices[0].message.tool_calls = [Mock()]
-    mock_response.choices[0].message.tool_calls[0].id = 'tool_call_10'
-    mock_response.choices[0].message.tool_calls[0].function = Mock()
-    mock_response.choices[0].message.tool_calls[0].function.name = 'invalid_tool'
-    mock_response.choices[0].message.tool_calls[0].function.arguments = '{}'
+    mock_response = ModelResponse(
+        id='mock-id',
+        choices=[
+            {
+                'message': {
+                    'content': 'Invalid tool',
+                    'tool_calls': [
+                        {
+                            'id': 'tool_call_10',
+                            'function': {'name': 'invalid_tool', 'arguments': '{}'},
+                        }
+                    ],
+                }
+            }
+        ],
+    )
 
     with pytest.raises(FunctionCallNotExistsError):
         response_to_actions(mock_response)

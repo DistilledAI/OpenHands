@@ -64,13 +64,20 @@ See [our documentation](https://docs.all-hands.dev/modules/usage/llms) for recom
 
 ### 4. Running the application
 
+First, check if .env exists and create it from the example if needed, then start the PostgreSQL container:
+
+````bash
+[ ! -f .env ] && cp .env.example .env
+docker-compose up -d postgres
+
+
 #### Option A: Run the Full Application
 
-Once the setup is complete, this command starts both the backend and frontend servers, allowing you to interact with OpenHands:
+Once the PostgreSQL container is running and the setup is complete, this command starts both the backend and frontend servers, allowing you to interact with OpenHands:
 
 ```bash
 make run
-```
+````
 
 #### Option B: Individual Server Startup
 

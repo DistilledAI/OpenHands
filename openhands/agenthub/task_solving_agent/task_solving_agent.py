@@ -1,6 +1,7 @@
 import os
 from collections import deque
 from datetime import datetime
+import json
 
 import openhands.agenthub.task_solving_agent.function_calling as task_solving_function_calling
 from openhands.controller.agent import Agent
@@ -44,14 +45,15 @@ class TaskSolvingAgent(Agent):
         self,
         llm: LLM,
         config: AgentConfig,
+        workspace_mount_path_in_sandbox_store_in_session: bool = True,
     ) -> None:
-        """Initializes a new instance of the CodeActAgent class.
+        """Initializes a new instance of the TaskSolvingAgent class.
 
         Parameters:
         - llm (LLM): The llm to be used by this agent
         - config (AgentConfig): The configuration for this agent
         """
-        super().__init__(llm, config)
+        super().__init__(llm, config, workspace_mount_path_in_sandbox_store_in_session)
         self.pending_actions: deque[Action] = deque()
         self.reset()
 
@@ -75,13 +77,12 @@ class TaskSolvingAgent(Agent):
         logger.debug(f'Using condenser: {type(self.condenser)}')
 
     def reset(self) -> None:
-        """Resets the CodeAct Agent."""
+        """Resets the Task Solving Agent."""
         super().reset()
         self.pending_actions.clear()
 
     def step(self, state: State) -> Action:
-        """Performs one step using the CodeAct Agent.
-
+        """Performs one step using the TaskSolving Agent.
         This includes gathering info on previous steps and prompting the model to make a command to execute.
 
         Parameters:
@@ -135,19 +136,26 @@ class TaskSolvingAgent(Agent):
             ]
             params['tools'] += unique_mcp_tools
 
-        import json
+        # debugging
         logger.debug(
             f'Available tool names inner TaskSolvingAgent: {", ".join([tool["function"]["name"] for tool in params["tools"]])}'
-        )
-        logger.debug(
-            f'LLM messages inner TaskSolvingAgent:\n{json.dumps(self.llm.format_messages_for_llm(messages), indent=2)}'
         )
 
         # log to litellm proxy if possible
         params['extra_body'] = {'metadata': state.to_llm_metadata(agent_name=self.name)}
-        response = self.llm.completion(**params)
+        try:
+            response = self.llm.completion(**params)
+        except Exception as e:
+            logger.warning(
+                f'Error in Task Solving Agent LLM completion with messages:\n{json.dumps(params["messages"], indent=2)}'
+            )
+            raise e
         logger.debug(f'Response from LLM: {response}')
-        actions = task_solving_function_calling.response_to_actions(response)
+        actions = task_solving_function_calling.response_to_actions(
+            response,
+            state.session_id,
+            self.workspace_mount_path_in_sandbox_store_in_session,
+        )
         logger.debug(f'Actions after response_to_actions: {actions}')
         for action in actions:
             self.pending_actions.append(action)

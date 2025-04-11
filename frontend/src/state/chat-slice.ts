@@ -15,7 +15,7 @@ type SliceState = { messages: Message[] };
 
 const MAX_CONTENT_LENGTH = 1000;
 
-const HANDLED_ACTIONS: OpenHandsEventType[] = [
+export const HANDLED_ACTIONS: OpenHandsEventType[] = [
   "run",
   "run_ipython",
   "write",
@@ -23,6 +23,9 @@ const HANDLED_ACTIONS: OpenHandsEventType[] = [
   "browse",
   "browse_interactive",
   "edit",
+  "mcp",
+  "call_tool_mcp",
+  "browser_mcp",
   "recall",
 ];
 
@@ -97,6 +100,7 @@ export const chatSlice = createSlice({
       if (!HANDLED_ACTIONS.includes(actionID)) {
         return;
       }
+      let messageActionID = actionID as string;
       const translationID = `ACTION_MESSAGE$${actionID.toUpperCase()}`;
       let text = "";
       if (actionID === "run") {
@@ -126,6 +130,9 @@ export const chatSlice = createSlice({
         }
       } else if (actionID === "think") {
         text = action.payload.args.thought;
+      } else if (actionID === "call_tool_mcp") {
+        text = `**Action:**\n\n${action.payload.message}\n\n`;
+        messageActionID = action.payload.args.name;
       }
       const message: Message = {
         type: "action",
@@ -135,6 +142,7 @@ export const chatSlice = createSlice({
         content: text,
         imageUrls: [],
         timestamp: new Date().toISOString(),
+        messageActionID,
         action,
       };
 
@@ -275,6 +283,19 @@ export const chatSlice = createSlice({
           content = `${content.slice(0, MAX_CONTENT_LENGTH)}...(truncated)`;
         }
         causeMessage.content = content;
+      } else if (observationID === "mcp") {
+        let { content } = observation.payload;
+        if (content.length > MAX_CONTENT_LENGTH) {
+          content = `${content.slice(0, MAX_CONTENT_LENGTH)}...`;
+        }
+        content = `${
+          causeMessage.content
+        }\n\nOutput:\n\`\`\`\n${content.trim() || "[MCP finished execution with no output]"}\n\`\`\``;
+        causeMessage.content = content;
+
+        causeMessage.success =
+          content.length > 0 &&
+          !content.toLowerCase().includes("'isError': True");
       }
     },
 

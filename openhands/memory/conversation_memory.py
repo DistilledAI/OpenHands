@@ -33,6 +33,7 @@ from openhands.events.observation import (
     FileEditObservation,
     FileReadObservation,
     IPythonRunCellObservation,
+    PlanObservation,
     UserRejectObservation,
 )
 from openhands.events.observation.agent import (
@@ -42,6 +43,9 @@ from openhands.events.observation.agent import (
 from openhands.events.observation.error import ErrorObservation
 from openhands.events.observation.mcp import MCPObservation
 from openhands.events.observation.observation import Observation
+from openhands.events.observation.playwright_mcp import (
+    BrowserMCPObservation,
+)
 from openhands.events.serialization.event import truncate_content
 from openhands.utils.prompt import PromptManager, RepositoryInfo, RuntimeInfo
 from openhands.controller.state.plan import Plan
@@ -366,17 +370,35 @@ class ConversationMemory:
             else:
                 text = truncate_content(obs.to_agent_observation(), max_message_chars)
             message = Message(role='user', content=[TextContent(text=text)])
+        # FIXME: This is a temporary solution to test MCP. Not sure if it's the best way to do it.
         elif isinstance(obs, MCPObservation):
-            # logger.warning(f'MCPObservation: {obs}')
+            # TODO FIXME: should we truncate the MCP message? If yes -> may lose context. If not may overload the context window
+            # message = Message(role='user', content=[TextContent(text=obs.content)])
             text = truncate_content(obs.content, max_message_chars)
             message = Message(role='user', content=[TextContent(text=text)])
+        elif isinstance(obs, BrowserMCPObservation):
+            text = obs.content
+            # logger.warning(f'MCPObservation: {obs}')
+            message = Message(role='user', content=[TextContent(text=obs.content)])
+
+        elif isinstance(obs, PlanObservation):
+            text = 'Plan: ' + obs.title
+            logger.info(f'Plan: {obs}')
+            for i in obs.tasks:
+                text += f'\n\n- Content: {i.get('content')} \n   - Status: {i['status']}\n   - Result: {i['result']}'
+            message = Message(
+                role='assistant',
+                content=[
+                    TextContent(text=text),
+                ],
+            )
         elif isinstance(obs, IPythonRunCellObservation):
             text = obs.content
             # replace base64 images with a placeholder
             splitted = text.split('\n')
-            for i, line in enumerate(splitted):
+            for index, line in enumerate(splitted):
                 if '![image](data:image/png;base64,' in line:
-                    splitted[i] = (
+                    splitted[index] = (
                         '![image](data:image/png;base64, ...) already displayed to user'
                     )
             text = '\n'.join(splitted)

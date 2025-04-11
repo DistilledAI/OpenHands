@@ -7,6 +7,8 @@ from openhands.agenthub import (  # noqa: E402
     browsing_agent,
     codeact_agent,
     dummy_agent,
+    future_trading_agent,
+    task_solving_agent,
     visualbrowsing_agent,
     planning_agent,
     task_solving_agent
@@ -21,4 +23,5 @@ __all__ = [
     'visualbrowsing_agent',
     'planning_agent',
     'task_solving_agent',
+    'future_trading_agent',
 ]

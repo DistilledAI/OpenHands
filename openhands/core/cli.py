@@ -7,7 +7,6 @@ from prompt_toolkit import PromptSession, print_formatted_text
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.key_binding import KeyBindings
 
-import openhands.agenthub  # noqa F401 (we import this to get the agents registered)
 from openhands.core.config import (
     AppConfig,
     parse_arguments,
@@ -196,7 +195,7 @@ async def main(loop: asyncio.AbstractEventLoop) -> None:
     display_message(f'Session ID: {sid}')
 
     agent = create_agent(config)
-    mcp_tools = await fetch_mcp_tools_from_config(config.mcp)
+    mcp_tools = await fetch_mcp_tools_from_config(config.dict_mcp_config, sid=sid)
     agent.set_mcp_tools(mcp_tools)
     runtime = create_runtime(
         config,
@@ -289,6 +288,9 @@ if __name__ == '__main__':
         print(f'Connection refused: {e}')
         sys.exit(1)
     except Exception as e:
+        import traceback
+
+        traceback.print_exc()
         print(f'An error occurred: {e}')
         sys.exit(1)
     finally:

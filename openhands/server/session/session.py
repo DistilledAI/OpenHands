@@ -96,6 +96,7 @@ class Session:
         settings: Settings,
         initial_message: MessageAction | None,
         replay_json: str | None,
+        mnemonic: str | None = None,
     ):
         self.agent_session.event_stream.add_event(
             AgentStateChangedObservation('', AgentState.LOADING),
@@ -150,7 +151,9 @@ class Session:
             self.logger.info(f'Enabling default condenser: {default_condenser_config}')
             agent_config.condenser = default_condenser_config
 
-        mcp_tools = await fetch_mcp_tools_from_config(self.config.mcp)
+        mcp_tools = await fetch_mcp_tools_from_config(
+            self.config.dict_mcp_config, sid=self.sid, mnemonic=mnemonic
+        )
         agent = Agent.get_cls(agent_cls)(llm, agent_config)
         agent.set_mcp_tools(mcp_tools)
 
@@ -160,7 +163,7 @@ class Session:
             planning_agent = Agent.get_cls(planning_agent_cls)(llm, planning_agent_config)
             planning_agent.set_mcp_tools(mcp_tools)
 
-
+        
         git_provider_tokens = None
         selected_repository = None
         selected_branch = None

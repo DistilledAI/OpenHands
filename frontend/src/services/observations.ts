@@ -1,15 +1,17 @@
+// @ts-nocheck
 import { setCurrentAgentState } from "#/state/agent-slice";
-import { setUrl, setScreenshotSrc } from "#/state/browser-slice";
-import store from "#/store";
-import { ObservationMessage } from "#/types/message";
-import { AgentState } from "#/types/agent-state";
-import { appendOutput } from "#/state/command-slice";
-import { appendJupyterOutput } from "#/state/jupyter-slice";
-import ObservationType from "#/types/observation-type";
+import { setScreenshotSrc, setUrl } from "#/state/browser-slice";
 import {
   addAssistantMessage,
   addAssistantObservation,
 } from "#/state/chat-slice";
+import { appendOutput } from "#/state/command-slice";
+import { setComputerList } from "#/state/computer-slice";
+import { appendJupyterOutput } from "#/state/jupyter-slice";
+import store from "#/store";
+import { AgentState } from "#/types/agent-state";
+import { ObservationMessage } from "#/types/message";
+import ObservationType from "#/types/observation-type";
 
 export function handleObservationMessage(message: ObservationMessage) {
   switch (message.observation) {
@@ -31,6 +33,7 @@ export function handleObservationMessage(message: ObservationMessage) {
       break;
     case ObservationType.BROWSE:
     case ObservationType.BROWSE_INTERACTIVE:
+    case ObservationType.BROWSER_MCP:
       if (message.extras?.screenshot) {
         store.dispatch(setScreenshotSrc(message.extras?.screenshot));
       }
@@ -51,6 +54,7 @@ export function handleObservationMessage(message: ObservationMessage) {
     case ObservationType.EDIT:
     case ObservationType.THINK:
     case ObservationType.NULL:
+    case ObservationType.MCP:
     case ObservationType.RECALL:
       break; // We don't display the default message for these observations
     default:
@@ -231,6 +235,30 @@ export function handleObservationMessage(message: ObservationMessage) {
               focused_element_bid: String(
                 message.extras.focused_element_bid || "",
               ),
+            },
+          }),
+        );
+        break;
+      case ObservationType.BROWSER_MCP:
+        store.dispatch(
+          addAssistantObservation({
+            ...baseObservation,
+            observation: ObservationType.BROWSER_MCP,
+            extras: {
+              url: String(message.extras.url || ""),
+              screenshot: String(message.extras.screenshot || ""),
+              trigger_by_action: String(message.extras.trigger_by_action || ""),
+            },
+          }),
+        );
+        break;
+      case ObservationType.MCP:
+        store.dispatch(
+          addAssistantObservation({
+            ...baseObservation,
+            observation: ObservationType.MCP,
+            extras: {
+              content: String(message.extras.content || ""),
             },
           }),
         );

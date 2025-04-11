@@ -10,8 +10,8 @@ export function Avatar({ src }: AvatarProps) {
   return (
     <img
       src={src}
-      alt={t(I18nKey.AVATAR$ALT_TEXT)}
-      className="w-full h-full rounded-full"
+      alt="user avatar"
+      className="w-full h-full rounded-full bg-gray-500"
     />
   );
 }

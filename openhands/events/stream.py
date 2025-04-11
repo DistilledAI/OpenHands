@@ -171,7 +171,9 @@ class EventStream(EventStore):
         data = event_to_dict(event)
         data = self._replace_secrets(data)
         event = event_from_dict(data)
+
         if event.id is not None:
+            # NODE: here is where we save the event to the file store
             self.file_store.write(
                 self._get_filename_for_id(event.id, self.user_id), json.dumps(data)
             )

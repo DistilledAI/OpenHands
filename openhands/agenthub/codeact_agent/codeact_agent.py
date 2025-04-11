@@ -57,14 +57,16 @@ class CodeActAgent(Agent):
         self,
         llm: LLM,
         config: AgentConfig,
+        workspace_mount_path_in_sandbox_store_in_session: bool = True,
     ) -> None:
         """Initializes a new instance of the CodeActAgent class.
 
         Parameters:
         - llm (LLM): The llm to be used by this agent
         - config (AgentConfig): The configuration for this agent
+        - workspace_mount_path_in_sandbox_store_in_session (bool, optional): Whether to store the workspace mount path in session. Defaults to True.
         """
-        super().__init__(llm, config)
+        super().__init__(llm, config, workspace_mount_path_in_sandbox_store_in_session)
         self.pending_actions: deque[Action] = deque()
         self.reset()
 
@@ -152,7 +154,11 @@ class CodeActAgent(Agent):
         params['extra_body'] = {'metadata': state.to_llm_metadata(agent_name=self.name)}
         response = self.llm.completion(**params)
         logger.debug(f'Response from LLM: {response}')
-        actions = codeact_function_calling.response_to_actions(response)
+        actions = codeact_function_calling.response_to_actions(
+            response,
+            state.session_id,
+            self.workspace_mount_path_in_sandbox_store_in_session,
+        )
         logger.debug(f'Actions after response_to_actions: {actions}')
         for action in actions:
             self.pending_actions.append(action)

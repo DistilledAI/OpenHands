@@ -13,6 +13,9 @@ export type OpenHandsEventType =
   | "think"
   | "finish"
   | "error"
+  | "browser_mcp"
+  | "mcp"
+  | "call_tool_mcp"
   | "recall";
 
 interface OpenHandsBaseEvent {

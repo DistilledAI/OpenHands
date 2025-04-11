@@ -12,6 +12,7 @@ export type Message = {
   pending?: boolean;
   translationID?: string;
   eventID?: number;
+  messageActionID?: string;
   observation?: PayloadAction<OpenHandsObservation>;
   action?: PayloadAction<OpenHandsAction>;
 };

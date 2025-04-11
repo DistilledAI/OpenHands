@@ -1,4 +1,5 @@
 import { AgentState } from "../agent-state";
+import ObservationType from "../observation-type";
 import { OpenHandsObservationEvent } from "./base";
 
 export interface AgentStateChangeObservation
@@ -109,6 +110,22 @@ export interface AgentThinkObservation
   };
 }
 
+export interface BrowserMCPObservation
+  extends OpenHandsObservationEvent<ObservationType.BROWSER_MCP> {
+  source: "agent";
+  extras: {
+    url: string;
+    screenshot: string;
+    trigger_by_action: string;
+  };
+}
+
+export interface MCPObservation extends OpenHandsObservationEvent<"mcp"> {
+  source: "agent";
+  extras: {
+    content: string;
+  };
+}
 export interface MicroagentKnowledge {
   name: string;
   trigger: string;
@@ -141,4 +158,6 @@ export type OpenHandsObservation =
   | ReadObservation
   | EditObservation
   | ErrorObservation
+  | BrowserMCPObservation
+  | MCPObservation
   | RecallObservation;

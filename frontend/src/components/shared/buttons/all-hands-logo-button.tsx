@@ -10,12 +10,8 @@ interface AllHandsLogoButtonProps {
 export function AllHandsLogoButton({ onClick }: AllHandsLogoButtonProps) {
   const { t } = useTranslation();
   return (
-    <TooltipButton
-      tooltip={t(I18nKey.BRANDING$ALL_HANDS_AI)}
-      ariaLabel={t(I18nKey.BRANDING$ALL_HANDS_LOGO)}
-      onClick={onClick}
-    >
-      <AllHandsLogo width={34} height={34} />
+    <TooltipButton tooltip="Thesis" ariaLabel="Thesis Logo" onClick={onClick}>
+      <AllHandsLogo />
     </TooltipButton>
   );
 }

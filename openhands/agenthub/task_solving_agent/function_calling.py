@@ -4,6 +4,7 @@ This is similar to the functionality of `CodeActResponseParser`.
 """
 
 import json
+from typing import Optional
 
 from litellm import (
     ChatCompletionToolParam,
@@ -21,8 +22,8 @@ from openhands.agenthub.task_solving_agent.tools import (
     create_str_replace_editor_tool,
 )
 from openhands.core.exceptions import (
-    FunctionCallNotExistsError,
     FunctionCallValidationError,
+    FunctionCallNotExistsError
 )
 from openhands.core.logger import openhands_logger as logger
 from openhands.events.action import (
@@ -55,7 +56,11 @@ def combine_thought(action: Action, thought: str) -> Action:
     return action
 
 
-def response_to_actions(response: ModelResponse) -> list[Action]:
+def response_to_actions(
+    response: ModelResponse,
+    sid: Optional[str],
+    workspace_mount_path_in_sandbox_store_in_session: bool = True,
+) -> list[Action]:
     actions: list[Action] = []
     assert len(response.choices) == 1, 'Only one choice is supported for now'
     choice = response.choices[0]
@@ -130,8 +135,16 @@ def response_to_actions(response: ModelResponse) -> list[Action]:
                     raise FunctionCallValidationError(
                         f'Missing required argument "content" in tool call {tool_call.function.name}'
                     )
+                path: str = arguments['path']
+                if (
+                    sid is not None
+                    and sid not in path
+                    and workspace_mount_path_in_sandbox_store_in_session
+                ):
+                    path = f"{path.rsplit('/', 1)[0]}/{sid}/{path.rsplit('/', 1)[1]}"
+
                 action = FileEditAction(
-                    path=arguments['path'],
+                    path=path,
                     content=arguments['content'],
                     start=arguments.get('start', 1),
                     end=arguments.get('end', -1),
@@ -149,6 +162,12 @@ def response_to_actions(response: ModelResponse) -> list[Action]:
                         f'Missing required argument "path" in tool call {tool_call.function.name}'
                     )
                 path = arguments['path']
+                if (
+                    sid is not None
+                    and sid not in path
+                    and workspace_mount_path_in_sandbox_store_in_session
+                ):
+                    path = f"{path.rsplit('/', 1)[0]}/{sid}/{path.rsplit('/', 1)[1]}"
                 command = arguments['command']
                 other_kwargs = {
                     k: v for k, v in arguments.items() if k not in ['command', 'path']
@@ -200,8 +219,12 @@ def response_to_actions(response: ModelResponse) -> list[Action]:
             # McpAction (MCP)
             # ================================================
             elif tool_call.function.name.endswith(MCPClientTool.postfix()):
+                original_action_name = tool_call.function.name.replace(
+                    MCPClientTool.postfix(), ''
+                )
+                logger.info(f'Original action name: {original_action_name}')
                 action = McpAction(
-                    name=tool_call.function.name.rstrip(MCPClientTool.postfix()),
+                    name=original_action_name,
                     arguments=tool_call.function.arguments,
                 )
             else:
@@ -227,13 +250,6 @@ def response_to_actions(response: ModelResponse) -> list[Action]:
                 wait_for_response=True,
             )
         )
-
-    # Add response id to actions
-    # This will ensure we can match both actions without tool calls (e.g. MessageAction)
-    # and actions with tool calls (e.g. CmdRunAction, IPythonRunCellAction, etc.)
-    # with the token usage data
-    for action in actions:
-        action.response_id = response.id
 
     assert len(actions) >= 1
     return actions

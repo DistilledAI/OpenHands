@@ -516,7 +516,7 @@ class PlanController:
                         plan_id=self.state.active_plan_id,
                         task_index=action.task_index,
                         task_content=plan.tasks[action.task_index].content,
-                        delegate_id=self.id + f'_{action.task_index}',
+                        delegate_id=self.id,
                     ),
                     EventSource.USER,
                 )

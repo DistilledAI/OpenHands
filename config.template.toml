@@ -69,6 +69,9 @@
 # Path to mount the workspace in the sandbox
 #workspace_mount_path_in_sandbox = "/workspace"
 
+# Whether to store the workspace mount path in session instead of using the default workspace_mount_path_in_sandbox
+#workspace_mount_path_in_sandbox_store_in_session = true
+
 # Path to mount the workspace
 #workspace_mount_path = ""
 
@@ -205,7 +208,6 @@ model = "gpt-4o"
 # in some scenarios. Use with caution and consider testing with your specific use case.
 # https://github.com/All-Hands-AI/OpenHands/pull/4711
 #native_tool_calling = None
-
 
 
 [llm.gpt4o-mini]
@@ -403,3 +405,10 @@ type = "noop"
 # Configuration for the evaluation, please refer to the specific evaluation
 # plugin for the available options
 ##############################################################################
+
+#################################### MCP ####################################
+# Configuration for MCP (Model Context Protocol) settings
+##############################################################################
+[mcp]
+[mcp.oraichain]
+url = "http://localhost:4000/sse"
